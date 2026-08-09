@@ -2,6 +2,10 @@ import argparse
 import numpy as np
 import torch
 import os
+from local_paths import (
+    GEARS_DATA_PATH, SAVE_DIR, RES_DIR, KERNEL_PATHS,
+    CUSTOM_TEST_SPLIT, ESSENTIAL_GENE_PATHS,
+)
 from utils import get_strategy
 from data_pert import Data
 from nets_pert import Net
@@ -191,7 +195,7 @@ if args.custom_split:
     if args.dataset_name != 'replogle_k562_gw_1000hvg':
         raise ValueError
     args.wb_exp_name += '_test_ess'
-    custom_test = '/home/huangk28/scratch/perturb_seq_data/gears_data/replogle_k562_essential_1000hvg+pert_in_gene/splits/replogle_k562_essential_1000hvg+pert_in_gene_active_1_0.75.pkl'
+    custom_test = CUSTOM_TEST_SPLIT
 else:
     custom_test = None
     
@@ -199,7 +203,7 @@ if args.lamb != 2:
     args.wb_exp_name += '_lamb' + str(args.lamb)
 
 if args.strategy_name == 'EssentialSampling':
-    custom_test = '/home/huangk28/scratch/perturb_seq_data/gears_data/replogle_k562_essential_1000hvg+pert_in_gene/splits/replogle_k562_essential_1000hvg+pert_in_gene_active_1_0.75.pkl'
+    custom_test = CUSTOM_TEST_SPLIT
     essential_gene = pickle.load(open(custom_test, 'rb'))['test'] + pickle.load(open(custom_test, 'rb'))['train']
 
 args.wb_exp_name += '_run' + str(args.run)
@@ -223,7 +227,7 @@ use_cuda = torch.cuda.is_available()
 device = torch.device(args.device if use_cuda else "cpu")
 print(device)
 
-path = '/home/huangk28/scratch/perturb_seq_data/gears_data/'
+path = GEARS_DATA_PATH
 dataset = Data(path, args.dataset_name, args.batch_size, args.test_fraction, args.seed, custom_test)
 n_features = dataset.pert_data.adata.X.shape[1]
 test_data = dataset.get_test_data()
@@ -310,9 +314,8 @@ else:
     args.wb_exp_name += '_' + args.strategy_name
 
 
-save_dir = '/home/huangk28/projects/active_pert/save_dir/' + args.wb_exp_name
-if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
+save_dir = os.path.join(SAVE_DIR, args.wb_exp_name)
+os.makedirs(save_dir, exist_ok=True)
     
 params = {
     'weight_bias_track': args.wandb,
@@ -362,14 +365,10 @@ if args.use_prior:
     import pickle
 
     def load_kernel(kernel_name):
-        if args.dataset_name == 'replogle_k562_gw_1000hvg':
-            kernel_path = '/home/huangk28/scratch/knowledge_kernels_gw/'
-        elif args.dataset_name == 'replogle_k562_essential_1000hvg+pert_in_gene':
-            kernel_path = '/home/huangk28/scratch/knowledge_kernels/'
-        elif args.dataset_name == 'replogle_rpe1_essential_1000hvg':
-            kernel_path = '/home/huangk28/scratch/knowledge_kernels_rpe1/'
-        else:
-            kernel_path = '/home/huangk28/scratch/knowledge_kernels_1k/'
+        kernel_path = KERNEL_PATHS.get(
+            args.dataset_name,
+            KERNEL_PATHS['replogle_k562_essential_1000hvg'],
+        )
         if not os.path.exists(kernel_path + kernel_name):
             raise ValueError('Kernel does not exist')
         with open(kernel_path + kernel_name + '/pert_list.pkl', 'rb') as f:
@@ -458,6 +457,31 @@ print(f"number of unlabeled pool: {dataset.n_pool-args.n_init_labeled}")
 print(f"number of testing pool: {dataset.n_test}")
 print()
 
+metrics = ['pearson_delta', 
+            'frac_opposite_direction_top20_non_dropout',
+            'mse_non_dropout',
+            'mse_top20_de_non_dropout',
+            'pearson_delta_top20_de_non_dropout', 'mse_4_non_dropout', 'mse_4_top20_de_non_dropout']
+
+round_metrics = []
+
+
+def record_round_metrics(round_idx, n_labeled, eval_out):
+    row = {
+        'run': args.run,
+        'seed': args.seed,
+        'round': round_idx,
+        'n_labeled': n_labeled,
+    }
+    for m in metrics:
+        vals = [j[m] for i, j in eval_out.items() if m in j]
+        if vals:
+            row[m] = float(np.mean(vals))
+    round_metrics.append(row)
+    if 'pearson_delta' in row:
+        print(f"Round {round_idx} pearson delta: {row['pearson_delta']}")
+
+
 # round 0 accuracy
 print("Round 0")
 if args.batch_exp:
@@ -477,17 +501,12 @@ else:
     strategy.train()
 
 res, out = strategy.eval(test_data)
-metrics = ['pearson_delta', 
-            'frac_opposite_direction_top20_non_dropout',
-            'mse_non_dropout',
-            'mse_top20_de_non_dropout',
-            'pearson_delta_top20_de_non_dropout', 'mse_4_non_dropout', 'mse_4_top20_de_non_dropout']
 
 if args.wandb:
     for m in metrics:
         wandb.log({'test_round_' + m: np.mean([j[m] for i,j in out.items() if m in j])})
 
-print(f"Round 0 pearson delta: {np.mean([j['pearson_delta'] for i,j in out.items() if 'pearson_delta' in j])}")
+record_round_metrics(0, args.n_init_labeled, out)
 
 
 round2query = {}
@@ -500,9 +519,10 @@ for rd in range(1, args.n_round+1):
         query_idxs = strategy.query(args.n_query, args.save_kernel, args.wb_exp_name + '_round' + str(rd), essential_gene)
     elif args.strategy_name == 'EssentialWeighted':
         if args.dataset_name == 'replogle_k562_gw_1000hvg':
-            gene2ess = pickle.load(open('/home/huangk28/scratch/knowledge_kernels_gw/' + args.essential_assay + '_essential/gene2ess.pkl', 'rb'))
+            ess_root = ESSENTIAL_GENE_PATHS['gw']
         else:
-            gene2ess = pickle.load(open('/home/huangk28/scratch/knowledge_kernels/' + args.essential_assay + '_essential/gene2ess.pkl', 'rb'))
+            ess_root = ESSENTIAL_GENE_PATHS['default']
+        gene2ess = pickle.load(open(os.path.join(ess_root, args.essential_assay + '_essential/gene2ess.pkl'), 'rb'))
         query_idxs = strategy.query(args.n_query, args.save_kernel, args.wb_exp_name + '_round' + str(rd), gene2ess)
     else:
         if args.valid_perts:
@@ -532,9 +552,25 @@ for rd in range(1, args.n_round+1):
         for m in metrics:
             wandb.log({'test_round_' + m: np.mean([j[m] for i,j in out.items() if m in j])})
 
-    print(f"Round {rd} pearson delta: {np.mean([j['pearson_delta'] for i,j in out.items() if 'pearson_delta' in j])}")
+    record_round_metrics(
+        rd,
+        args.n_init_labeled + rd * args.n_query,
+        out,
+    )
 
 
 import pickle
-with open('./res/' + args.wb_exp_name + '.pkl', 'wb') as f:
+import pandas as pd
+
+os.makedirs(RES_DIR, exist_ok=True)
+result_base = os.path.join(RES_DIR, args.wb_exp_name)
+with open(result_base + '.pkl', 'wb') as f:
     pickle.dump(round2query, f)
+
+metrics_csv = result_base + '_metrics.csv'
+metrics_pkl = result_base + '_metrics.pkl'
+pd.DataFrame(round_metrics).to_csv(metrics_csv, index=False)
+with open(metrics_pkl, 'wb') as f:
+    pickle.dump(round_metrics, f)
+print(f"Saved query results to {result_base}.pkl")
+print(f"Saved round metrics to {metrics_csv}")
