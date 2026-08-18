@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import os
 from gears import PertData
 import pickle
 
@@ -9,7 +10,7 @@ class Data:
         
         pert_data = PertData(path) # specific saved folder
         if data_name == 'adamson':
-            pert_data.load(data_path = '/home/huangk28/projects/active_pert/tutorials/data/adamson')
+            pert_data.load(data_path = os.path.join(path, 'adamson'))
         else:
             pert_data.load(data_path = path + data_name)
 

@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from .strategy import Strategy
 from tqdm import tqdm
 import pandas as pd
@@ -6,6 +7,7 @@ from bmdal_reg.bmdal.feature_data import TensorFeatureData
 from bmdal_reg.bmdal.algorithms import select_batch, BatchSelectorImpl
 import torch
 import pickle
+from local_paths import GRADIENT_KERNEL_DIR
 
 def get_index(A, B):
     index_dict_A = {val: i for i, val in enumerate(A)}
@@ -122,7 +124,7 @@ class kernel_based_active_learning(Strategy):
                 'pool_feat': x_pool.detach().cpu().numpy(),
                 'train_feat': x_train.detach().cpu().numpy()
             }
-            with open('/home/huangk28/scratch/knowledge_kernels/gradient_kernel/' + save_name + '_raw.pkl', 'wb') as f:
+            with open(os.path.join(GRADIENT_KERNEL_DIR, save_name + '_raw.pkl'), 'wb') as f:
                 pickle.dump(save_matrix, f)
         
 

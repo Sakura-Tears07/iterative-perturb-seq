@@ -4,7 +4,7 @@ import torch
 import os
 from local_paths import (
     GEARS_DATA_PATH, SAVE_DIR, RES_DIR, KERNEL_PATHS,
-    CUSTOM_TEST_SPLIT, ESSENTIAL_GENE_PATHS,
+    CUSTOM_TEST_SPLIT, ESSENTIAL_GENE_PATHS, resolve_result_dir,
 )
 from utils import get_strategy
 from data_pert import Data
@@ -562,8 +562,9 @@ for rd in range(1, args.n_round+1):
 import pickle
 import pandas as pd
 
-os.makedirs(RES_DIR, exist_ok=True)
-result_base = os.path.join(RES_DIR, args.wb_exp_name)
+result_dir = resolve_result_dir(args)
+os.makedirs(result_dir, exist_ok=True)
+result_base = os.path.join(result_dir, args.wb_exp_name)
 with open(result_base + '.pkl', 'wb') as f:
     pickle.dump(round2query, f)
 

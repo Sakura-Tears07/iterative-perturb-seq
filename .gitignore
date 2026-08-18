@@ -1,5 +1,15 @@
-wandb/
-gears_data/
+# Experiment outputs (keep layout docs and maintenance script wrappers)
+results/*
+!results/README.md
+!results/fig4/
+results/fig4/*
+!results/fig4/_scripts/
+!results/fig4/_scripts/**
+
+# Local analysis artifacts (stay on thoughts branch)
+scripts/
+configs/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
