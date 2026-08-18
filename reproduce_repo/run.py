@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import os
 from local_paths import (
-    GEARS_DATA_PATH, SAVE_DIR, RES_DIR, KERNEL_PATHS,
+    DATA_ROOT, GEARS_DATA_PATH, SAVE_DIR, RES_DIR, KERNEL_PATHS,
     CUSTOM_TEST_SPLIT, ESSENTIAL_GENE_PATHS, resolve_result_dir,
 )
 from utils import get_strategy
@@ -112,6 +112,12 @@ parser.add_argument('--valid_perts', action = 'store_true', default=False)
 
 parser.add_argument('--lamb', type=float, default=2)
 parser.add_argument('--batch_exp', action = 'store_true', default=False)
+parser.add_argument('--selection_log', action='store_true', default=False)
+parser.add_argument('--selection_log_dir', type=str, default=os.path.join(DATA_ROOT, 'round_states'))
+parser.add_argument('--duplicate_prior', type=str, default='')
+parser.add_argument('--duplicate_copies', type=int, default=1)
+parser.add_argument('--corrupt_prior', type=str, default='')
+parser.add_argument('--corrupt_mode', type=str, choices=['permute', 'none'], default='none')
 
 args = parser.parse_args()
 
@@ -187,6 +193,12 @@ if args.use_prior:
 
 if add_ctrl:
     args.wb_exp_name += '_add_ctrl'
+
+if args.duplicate_prior:
+    args.wb_exp_name += f'_dup{args.duplicate_copies}_{args.duplicate_prior.replace("_kernel", "")}'
+
+if args.corrupt_prior and args.corrupt_mode != 'none':
+    args.wb_exp_name += f'_corrupt_{args.corrupt_mode}_{args.corrupt_prior.replace("_kernel", "")}'
 
 if args.sample_cells_training:
     args.wb_exp_name += '_sct'
@@ -394,10 +406,28 @@ if args.use_prior:
             kernel_list = ['pops_kernel', 'rpe1_kernel', 'esm_kernel', 
                        'biogpt_kernel', 'node2vec_kernel', 'ops_A549_kernel',
                        'ops_HeLa_HPLM_kernel', 'ops_HeLa_DMEM_kernel']
+
+    if args.duplicate_prior:
+        expanded = []
+        for kernel_name in kernel_list:
+            if kernel_name == args.duplicate_prior:
+                expanded.extend([kernel_name] * max(1, args.duplicate_copies))
+            else:
+                expanded.append(kernel_name)
+        kernel_list = expanded
+
+    def maybe_corrupt_kernel(kernel_name, kernel_npy):
+        if args.corrupt_prior and kernel_name == args.corrupt_prior and args.corrupt_mode == 'permute':
+            rng = np.random.default_rng(args.seed)
+            perm = rng.permutation(kernel_npy.shape[0])
+            return kernel_npy[np.ix_(perm, perm)]
+        return kernel_npy
+
     prior_kernel_list, prior_feat_list = [],[] 
     
     for i in kernel_list:
         _, k, f = load_kernel(i)
+        k = maybe_corrupt_kernel(i, k)
         if args.kernel_normalize_feat:
             print('normalizing feature and then compute kernels!')
             from sklearn.preprocessing import StandardScaler    
@@ -421,7 +451,11 @@ if args.use_prior:
                                                     prior_kernel_list = prior_kernel_list, prior_kernel_pert_list = pert_list, 
                                                     train_gold = true_gold, normalize_kernel = args.normalize_kernel,
                                                     normalize_method = args.normalize_method, add_ctrl = add_ctrl, 
-                                                    prior_feat_list = prior_feat_list, gene_hvg_idx = gene_hvg_idx, lamb = args.lamb)
+                                                    prior_feat_list = prior_feat_list, gene_hvg_idx = gene_hvg_idx, lamb = args.lamb,
+                                                    prior_kernel_names = [k.replace('_kernel', '') for k in kernel_list],
+                                                    selection_log = args.selection_log,
+                                                    selection_log_dir = args.selection_log_dir,
+                                                    run_id = args.run, seed = args.seed)
     elif args.strategy_name in ['KMeansSampling', 'MaxDist', 'TypiClust']:
         strategy = get_strategy(args.strategy_name)(dataset, net, args.base_kernel, use_prior_only = args.use_prior_only, 
                                                     integrate_mode = args.integrate_mode, normalize_mode = args.normalize_mode, 

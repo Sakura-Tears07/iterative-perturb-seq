@@ -7,11 +7,13 @@ from bmdal_reg.bmdal.feature_data import TensorFeatureData
 from bmdal_reg.bmdal.algorithms import select_batch, BatchSelectorImpl
 import torch
 import pickle
-from local_paths import GRADIENT_KERNEL_DIR
+from local_paths import DATA_ROOT, GRADIENT_KERNEL_DIR
 
 def get_index(A, B):
     index_dict_A = {val: i for i, val in enumerate(A)}
     return np.array([index_dict_A[b] for b in B])
+
+DEFAULT_SELECTION_LOG_DIR = os.path.join(DATA_ROOT, "round_states")
 
 
 class kernel_based_active_learning(Strategy):
@@ -20,7 +22,9 @@ class kernel_based_active_learning(Strategy):
                  use_prior_only = False, integrate_mode = 'mean', normalize_mode = 'diag', 
                  prior_kernel_list = None, prior_kernel_pert_list = None, train_gold = None, 
                  normalize_kernel = False, normalize_method = None, add_ctrl = False, 
-                 prior_feat_list = None, gene_hvg_idx = None, lamb = None):
+                 prior_feat_list = None, gene_hvg_idx = None, lamb = None,
+                 prior_kernel_names = None, selection_log = False,
+                 selection_log_dir = DEFAULT_SELECTION_LOG_DIR, run_id = None, seed = None):
         super(kernel_based_active_learning, self).__init__(dataset, net)
         self.selection_method = selection_method
         self.base_kernel = base_kernel
@@ -40,6 +44,64 @@ class kernel_based_active_learning(Strategy):
         self.prior_feat_list = prior_feat_list
         self.gene_hvg_idx = gene_hvg_idx
         self.lamb = lamb
+        self.prior_kernel_names = prior_kernel_names
+        self.selection_log = selection_log
+        self.selection_log_dir = selection_log_dir
+        self.run_id = run_id
+        self.seed = seed
+
+    def _save_selection_logs(self, save_name, round_id, n_labeled_before, pool_list, train_list, results_dict):
+        os.makedirs(self.selection_log_dir, exist_ok=True)
+        repo_log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "results", "selection_logs")
+        os.makedirs(repo_log_dir, exist_ok=True)
+
+        meta = {
+            "save_name": save_name,
+            "run_id": self.run_id,
+            "seed": self.seed,
+            "round": round_id,
+            "n_labeled_before": n_labeled_before,
+            "strategy": self.selection_method,
+            "integrate_mode": self.integrate_mode,
+        }
+        if results_dict.get("fusion_weights") is not None:
+            meta["fusion_weights"] = results_dict["fusion_weights"]
+            weights = np.array(list(results_dict["fusion_weights"].values()), dtype=float)
+            weights = weights / weights.sum() if weights.sum() > 0 else weights
+            meta["weight_entropy"] = float(-(weights * np.log(weights + 1e-12)).sum())
+
+        selected_records = results_dict.get("selection_log", {}).get("selected_records", [])
+        if selected_records:
+            rows = []
+            for rec in selected_records:
+                row = dict(meta)
+                row.update(rec)
+                rows.append(row)
+            selected_df = pd.DataFrame(rows)
+            selected_path = os.path.join(self.selection_log_dir, f"{save_name}_selected_only.parquet")
+            try:
+                selected_df.to_parquet(selected_path, index=False)
+            except Exception:
+                selected_df.to_pickle(selected_path.replace(".parquet", ".pkl"))
+            selected_df.to_csv(os.path.join(repo_log_dir, f"{save_name}_selected_only.csv"), index=False)
+
+        snapshots = results_dict.get("selection_log", {}).get("candidate_snapshots", [])
+        if snapshots:
+            with open(os.path.join(self.selection_log_dir, f"{save_name}_candidate_snapshot.pkl"), "wb") as f:
+                pickle.dump({"meta": meta, "snapshots": snapshots}, f)
+
+        if results_dict.get("round_state") is not None:
+            round_state = {
+                **meta,
+                "pert_list": self.prior_kernel_pert_list,
+                "pool_genes": pool_list,
+                "train_genes": train_list,
+                **results_dict["round_state"],
+            }
+            state_path = os.path.join(self.selection_log_dir, f"{save_name}_state.pkl")
+            with open(state_path, "wb") as f:
+                pickle.dump(round_state, f)
+
     def query(self, n, save_kernel = False, save_name = None, valid_perts = None, round = None):
         strategy = self
         
@@ -53,6 +115,7 @@ class kernel_based_active_learning(Strategy):
         #if self.base_kernel in base_kernel_list:
             #labeled_idxs, train_data = strategy.dataset.get_train_data(get_distinct_perts = True)
         labeled_idxs, train_data = strategy.dataset.get_train_data(get_distinct_perts = True)
+        n_labeled_before = len(labeled_idxs)
         res = strategy.get_latent_emb(train_data, self.base_kernel)
         print('Feature size is: ' + str(res['latent_feat'].shape[1]))
         pert2pred = dict(pd.DataFrame(zip(res['pert_cat'], res['latent_feat'])).groupby(0)[1].agg(agg_fct))
@@ -162,9 +225,25 @@ class kernel_based_active_learning(Strategy):
             bs = BatchSelectorImpl([self.net], {'train': train_data, 'pool': pool_data}, 0, train_gold = train_gold, prior_kernel_list = prior_kernel_list_reindex, 
                         use_prior_only = self.use_prior_only, integrate_mode = self.integrate_mode, normalize_mode = self.normalize_mode, valid_perts = valid_perts, 
                         lamb = self.lamb, round = round)
-            new_idxs, _ = bs.select(selection_method=self.selection_method + '_prior', sel_with_train=self.sel_with_train,
-                        base_kernel=base_kernel, kernel_transforms=self.kernel_transforms,
-                        batch_size=n)
+            select_kwargs = dict(
+                selection_method=self.selection_method + '_prior',
+                sel_with_train=self.sel_with_train,
+                base_kernel=base_kernel,
+                kernel_transforms=self.kernel_transforms,
+                batch_size=n,
+            )
+            if self.selection_log:
+                select_kwargs.update({
+                    'selection_log': True,
+                    'pool_gene_names': pool_list,
+                    'prior_kernel_names': self.prior_kernel_names,
+                    'snapshot_steps': (0, 10, 50, 99),
+                })
+            new_idxs, results_dict = bs.select(**select_kwargs)
+            if self.selection_log and save_name is not None:
+                self._save_selection_logs(
+                    save_name, round, n_labeled_before, pool_list, train_list, results_dict
+                )
             
 
         else:

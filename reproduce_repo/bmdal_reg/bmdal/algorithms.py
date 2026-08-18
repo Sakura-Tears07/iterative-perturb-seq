@@ -626,10 +626,20 @@ class BatchSelectorImpl:
 
         #print(self.prior_kernel_list)
         # compute updated prior kernels
+        fusion_weights = None
+        kernel_names = None
         if self.prior_kernel_list is not None:
             if self.integrate_mode != 'learn':
                 print('normalizing prior kernel using ' + str(self.normalize_mode))
                 self.prior_kernel_list = [normalize_kernel(k, mode = self.normalize_mode) for k in self.prior_kernel_list]
+
+            n_priors = len(self.prior_kernel_list)
+            if config.get('prior_kernel_names'):
+                kernel_names = list(config['prior_kernel_names'])
+            else:
+                kernel_names = [f'prior_{i}' for i in range(n_priors)]
+            if not self.use_prior_only:
+                kernel_names = kernel_names + ['model']
 
             ## compute the kernel matrix
             if not self.use_prior_only:
@@ -682,6 +692,7 @@ class BatchSelectorImpl:
             
             elif self.integrate_mode == 'mean_new':
                 weights = [1/len(kernel_all)] * len(kernel_all)
+                fusion_weights = {name: float(w) for name, w in zip(kernel_names, weights)}
                 k_agg = np.zeros_like(kernel_all[0])
                 for K, w in zip(kernel_all, weights):
                     k_agg += w * K
@@ -701,6 +712,7 @@ class BatchSelectorImpl:
 
                 alignments = [kernel_alignment(K, self.train_gold) for K in kernel_sub]
                 weights = np.array(alignments) / np.sum(alignments)  # normalize to make them sum to 1
+                fusion_weights = {name: float(w) for name, w in zip(kernel_names, weights)}
                 print('weights: ', weights)
                 k_agg = np.zeros_like(kernel_all[0])
                 for K, w in zip(kernel_all, weights):
@@ -822,7 +834,20 @@ class BatchSelectorImpl:
             alg = DirichletSelectionMethod(self.features['pool'], self.features['train'], lamb = self.lamb, round = self.round, prior = k_agg, **config)     
         elif selection_method == 'maxdist_prior':
             k_agg = torch.tensor(k_agg).to(self.device)
-            alg = MaxDistSelectionMethodwithPrior(self.features['pool'], self.features['train'], prior = k_agg, **config)
+            if config.get('selection_log', False):
+                alg = LoggedMaxDistSelectionMethodwithPrior(
+                    self.features['pool'],
+                    self.features['train'],
+                    prior=k_agg,
+                    component_kernels=kernel_all if self.prior_kernel_list is not None else [],
+                    kernel_names=kernel_names if self.prior_kernel_list is not None else [],
+                    pool_gene_names=config.get('pool_gene_names'),
+                    prior_weights=fusion_weights,
+                    snapshot_steps=config.get('snapshot_steps', (0, 10, 50, 99)),
+                    **config,
+                )
+            else:
+                alg = MaxDistSelectionMethodwithPrior(self.features['pool'], self.features['train'], prior = k_agg, **config)
         elif selection_method == 'lcmd':
             alg = LargestClusterMaxDistSelectionMethod(self.features['pool'], self.features['train'], **config)
         elif selection_method == 'rmds':
@@ -864,6 +889,17 @@ class BatchSelectorImpl:
 
         if eff_dim is not None:
             results_dict['eff_dim'] = eff_dim
+
+        if config.get('selection_log', False) and hasattr(alg, 'get_selection_log'):
+            results_dict['selection_log'] = alg.get_selection_log()
+        if fusion_weights is not None:
+            results_dict['fusion_weights'] = fusion_weights
+        if self.prior_kernel_list is not None and self.integrate_mode != 'learn':
+            results_dict['round_state'] = {
+                'base_kernel': base_k if not self.use_prior_only else None,
+                'kernel_names': kernel_names,
+                'integrate_mode': self.integrate_mode,
+            }
 
         torch.backends.cuda.matmul.allow_tf32 = allow_tf32_before
 

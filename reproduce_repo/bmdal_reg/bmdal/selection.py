@@ -1,4 +1,5 @@
 from abc import ABC
+import json
 import numpy as np
 
 from .features import *
@@ -606,6 +607,131 @@ class MaxDistSelectionMethodwithPrior(IterativeSelectionMethod):
         #if new_idx < len(self.pool_features):
         #    print('sq dists at new idx:', sq_dists[new_idx].item(), 'and', self.min_sq_dists[new_idx].item())
 
+
+class LoggedMaxDistSelectionMethodwithPrior(MaxDistSelectionMethodwithPrior):
+    """MaxDist on fused prior kernel with batch-step selection diagnostics."""
+
+    def __init__(
+        self,
+        pool_features: Features,
+        train_features: Features,
+        sel_with_train: bool = True,
+        prior=None,
+        component_kernels=None,
+        kernel_names=None,
+        pool_gene_names=None,
+        prior_weights=None,
+        snapshot_steps=(0, 10, 50, 99),
+        **config,
+    ):
+        super().__init__(
+            pool_features=pool_features,
+            train_features=train_features,
+            sel_with_train=sel_with_train,
+            prior=prior,
+            **config,
+        )
+        self.component_kernels = component_kernels or []
+        self.kernel_names = kernel_names or []
+        self.pool_gene_names = pool_gene_names or []
+        self.prior_weights = prior_weights
+        self.snapshot_steps = set(snapshot_steps)
+        self.selection_records = []
+        self.candidate_snapshots = []
+
+    def _kernel_numpy(self, kernel):
+        if torch.is_tensor(kernel):
+            return kernel.detach().cpu().numpy()
+        return np.asarray(kernel)
+
+    def _anchor_indices(self):
+        n_pool = self.pool_features.get_n_samples()
+        train_offsets = [n_pool + i for i in range(self.train_features.get_n_samples())]
+        return train_offsets + list(self.selected_idxs)
+
+    def _pairwise_sq_dist(self, K, i, j):
+        return float(K[i, i] + K[j, j] - 2.0 * K[i, j])
+
+    def _diagnostics_for_idx(self, pool_idx: int, fused_score: float):
+        n_pool = self.pool_features.get_n_samples()
+        K_fused = self._kernel_numpy(self.prior)
+        anchors = self._anchor_indices()
+
+        nearest_anchor = None
+        nearest_dist = np.inf
+        for a in anchors:
+            d = self._pairwise_sq_dist(K_fused, pool_idx, a)
+            if d < nearest_dist:
+                nearest_dist = d
+                nearest_anchor = a
+
+        prior_distances = {}
+        for name, kernel in zip(self.kernel_names, self.component_kernels):
+            K = self._kernel_numpy(kernel)
+            best = np.inf
+            for a in anchors:
+                best = min(best, self._pairwise_sq_dist(K, pool_idx, a))
+            prior_distances[name] = float(best)
+
+        gene_name = ""
+        if self.pool_gene_names and 0 <= pool_idx < len(self.pool_gene_names):
+            gene_name = self.pool_gene_names[pool_idx]
+
+        nearest_gene = ""
+        if nearest_anchor is not None and nearest_anchor < n_pool and self.pool_gene_names:
+            nearest_gene = self.pool_gene_names[nearest_anchor]
+        elif nearest_anchor is not None and nearest_anchor >= n_pool:
+            nearest_gene = f"train_offset_{nearest_anchor - n_pool}"
+
+        return {
+            "selected_gene_idx": int(pool_idx),
+            "selected_gene_name": gene_name,
+            "fused_min_distance": float(fused_score),
+            "nearest_anchor_idx": None if nearest_anchor is None else int(nearest_anchor),
+            "nearest_anchor_gene": nearest_gene,
+            "prior_distances_json": json.dumps(prior_distances),
+            "prior_weights_json": json.dumps(self.prior_weights or {}),
+            "pool_size_before": int(n_pool),
+        }
+
+    def _maybe_snapshot(self, batch_step: int):
+        if batch_step not in self.snapshot_steps:
+            return
+        scores = self.get_scores().detach().cpu().numpy()
+        top_idx = np.argsort(-scores)[: min(20, len(scores))]
+        self.candidate_snapshots.append({
+            "batch_step": int(batch_step),
+            "top_pool_indices": top_idx.tolist(),
+            "top_scores": scores[top_idx].tolist(),
+            "top_genes": [self.pool_gene_names[i] for i in top_idx] if self.pool_gene_names else [],
+        })
+
+    def get_next_idx(self) -> Optional[int]:
+        if self.n_added == 0:
+            idx = torch.argmax(torch.diag(self.prior, 0)[: len(self.pool_features)]).item()
+            diag_score = torch.diag(self.prior, 0)[idx].item()
+            rec = self._diagnostics_for_idx(idx, diag_score)
+            rec["batch_step"] = len(self.selection_records)
+            rec["selection_mode"] = "max_diag_init"
+            self.selection_records.append(rec)
+            self._maybe_snapshot(rec["batch_step"])
+            return idx
+
+        scores = self.get_scores().clone()
+        scores[self.selected_idxs] = -np.Inf
+        idx = torch.argmax(scores).item()
+        rec = self._diagnostics_for_idx(idx, float(scores[idx].item()))
+        rec["batch_step"] = len(self.selection_records)
+        rec["selection_mode"] = "max_min_distance"
+        self.selection_records.append(rec)
+        self._maybe_snapshot(rec["batch_step"])
+        return idx
+
+    def get_selection_log(self):
+        return {
+            "selected_records": self.selection_records,
+            "candidate_snapshots": self.candidate_snapshots,
+        }
 
 
 class DirichletSelectionMethod(IterativeSelectionMethod):

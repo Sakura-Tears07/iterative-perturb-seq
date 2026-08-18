@@ -6,10 +6,8 @@ results/fig4/*
 !results/fig4/_scripts/
 !results/fig4/_scripts/**
 
-# Local analysis artifacts (stay on thoughts branch)
-scripts/
-configs/
-
+# Generated analysis outputs (thoughts branch scripts write here)
+results/analysis/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
