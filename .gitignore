@@ -7,6 +7,7 @@ results/**/runs/
 results/**/*.pkl
 results/analysis/
 results/pilot/
+results/selection_logs/
 !results/fig4/_scripts/
 !results/fig4/_scripts/**
 !results/fig4/comparison/
@@ -18,6 +19,7 @@ results/fig4/essential_1k/**/runs/
 !results/fig4/essential_1k/**/manifests/
 !results/fig4c/comparison/
 !results/fig4c/comparison/**
+!results/REPRODUCTION_SUMMARY.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
