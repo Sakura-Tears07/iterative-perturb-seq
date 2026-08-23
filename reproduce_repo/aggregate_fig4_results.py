@@ -25,7 +25,14 @@ COMMIT = "52011a935e8e9e9a14b7d92a99c6c014d46e6db5"
 METHODS = {
     "IterPert": {
         "pattern": "*priormean_new_max*Core-Set_diff_effect_metrics.csv",
-        "filter": lambda f: "100_5_100" in f and "single_" not in f,
+        "filter": lambda f: (
+            "100_5_100" in f
+            and "single_" not in f
+            and "/essential_1k/iterpert/runs/" in f
+            and "dup" not in f
+            and "alignment" not in f
+            and "prior_only" not in f
+        ),
         "color": "#d62728",
     },
     "Random": {"pattern": "*Random_cross_gene_out_metrics.csv", "filter": lambda f: "100_5_100" in f, "color": "#7f7f7f"},

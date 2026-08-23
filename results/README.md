@@ -2,48 +2,34 @@
 
 ```
 results/
-├── fig4/
+├── fig4/                          # 论文 Fig.4 Essential 1K
 │   ├── essential_1k/
-│   │   ├── iterpert/
-│   │   │   ├── runs/        # 原始 run 输出 (*.pkl, *_metrics.csv)
-│   │   │   ├── tables/      # summary.csv, pivot.csv
-│   │   │   ├── figures/     # 方法专属图
-│   │   │   └── manifests/   # 封存说明
-│   │   ├── baselines/
-│   │   │   ├── random/      # 同上结构
-│   │   │   ├── badge/
-│   │   │   └── ...
-│   │   └── smoke/runs/
-│   ├── comparison/          # 跨方法对比
-│   │   ├── tables/          # all_methods_summary.csv 等
-│   │   ├── figures/         # all_methods.png 等
-│   │   └── manifests/
-│   └── _scripts/            # 维护脚本 wrapper
-├── fig4c/
-│   └── single_prior/
-│       └── {prior}/
-│           └── runs/
-├── fig6/genome_wide/runs/   # Fig.6 (future)
-└── misc/
+│   │   ├── iterpert/runs/         # 10× metrics.csv（主实验）
+│   │   ├── baselines/{method}/runs/
+│   │   └── */tables/              # 每方法 summary/pivot
+│   └── comparison/                # 跨方法汇总（tables + figures）
+├── fig4c/                         # 论文 Fig.4c 单 prior 消融
+│   ├── single_prior/{prior}/runs/ # 每个 prior 5× metrics.csv
+│   └── comparison/                # 8 prior 对比曲线
+├── pilot/                         # thoughts 分支 P1 机制实验（非论文主复现）
+│   ├── iterpert_runs/             # alignment/dup/prior_only 等 smoke
+│   └── selection_logs/            # --selection_log 诊断 CSV
+├── analysis/                      # E0 离线分析（thoughts 分支脚本产出）
+└── README.md
 ```
 
 ## 维护命令
 
-从仓库根目录运行（推荐）：
-
 ```bash
-# 1. 归类 results/ 根目录下的 flat GEARS_* 文件 → fig4/fig4c/.../runs/
+# 归类 flat GEARS_* → fig4/fig4c/.../runs/
 python reproduce_repo/reorganize_results.py
 
-# 2. 整理 runs/tables/comparison 二级结构（已整理时会提示 up to date）
+# 整理二级目录结构
 python reproduce_repo/reorganize_results_structure.py
 
-# 3. 重新生成 Fig.4 汇总表和对比图
+# 汇总 Fig.4 / Fig.4c
 python reproduce_repo/aggregate_fig4_results.py
+python reproduce_repo/aggregate_fig4c_results.py
 ```
 
-也可从 `results/fig4/_scripts/` 运行同名 wrapper。
-
-**注意**：步骤 1 处理根目录散落的 `GEARS_*`；步骤 2 不会移动 flat 文件。若根目录仍有 `GEARS_*`，请先跑步骤 1。
-
-新实验输出路径由 `local_paths.resolve_result_dir()` 自动写入 `{category}/runs/`。
+**注意**：`pilot/` 和 `analysis/` 不属于论文 Fig.4 主实验，不要与 `fig4/essential_1k/` 混放。

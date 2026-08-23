@@ -1,0 +1,18 @@
+Fig.4c Single-Prior Ablation — Complete Reproduction Summary
+==============================================================
+Commit:  52011a935e8e9e9a14b7d92a99c6c014d46e6db5
+Dataset: replogle_k562_essential_1000hvg
+Config:  IterPert single prior, Core-Set, diff_effect, mean_new/max
+Runs:    seed=1, run=1..5, epoch=20, init=100, query=100, rounds=5
+
+@600 ranking (mean ± std, 5 runs each):
+   1. ops_HeLa_DMEM_kernel    0.2989 ± 0.0064
+   2. ops_HeLa_HPLM_kernel    0.2952 ± 0.0118
+   3. rpe1_kernel             0.2904 ± 0.0091
+   4. ops_A549_kernel         0.2782 ± 0.0140
+   5. pops_kernel             0.2669 ± 0.0033
+   6. biogpt_kernel           0.2531 ± 0.0200
+   7. esm_kernel              0.2510 ± 0.0164
+   8. node2vec_kernel         0.1991 ± 0.0258
+
+Status: ALL 8 PRIORS COMPLETE (40 runs total)
