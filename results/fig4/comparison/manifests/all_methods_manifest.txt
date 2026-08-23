@@ -1,0 +1,20 @@
+Fig.4 Essential 1K — Complete Reproduction Summary
+====================================================
+Commit:  52011a935e8e9e9a14b7d92a99c6c014d46e6db5
+Dataset: replogle_k562_essential_1000hvg
+Metric:  pearson_delta (test set, fix_evaluation=True)
+Runs:    seed=1, run=1..10, epoch=20, init=100, query=100, rounds=5
+
+@600 ranking (mean ± std):
+   1. IterPert      0.2845 ± 0.0121  (n=10)
+   2. BADGE         0.2770 ± 0.0126  (n=10)
+   3. LCMD          0.2764 ± 0.0111  (n=10)
+   4. ACS-FW        0.2747 ± 0.0159  (n=10)
+   5. TypiClust     0.2747 ± 0.0126  (n=10)
+   6. KMeans        0.2746 ± 0.0187  (n=10)
+   7. Random        0.2620 ± 0.0139  (n=10)
+   8. Core-Set      0.2512 ± 0.0257  (n=10)
+   9. BatchBALD     0.2500 ± 0.0158  (n=10)
+  10. BALD          0.2487 ± 0.0136  (n=10)
+
+Status: ALL 10 METHODS COMPLETE

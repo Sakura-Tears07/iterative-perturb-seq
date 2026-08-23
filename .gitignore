@@ -1,13 +1,23 @@
-# Experiment outputs (keep layout docs and maintenance script wrappers)
+# Experiment outputs: track summaries, ignore raw runs
 results/*
 !results/README.md
 !results/fig4/
-results/fig4/*
+!results/fig4c/
+results/**/runs/
+results/**/*.pkl
+results/analysis/
+results/pilot/
 !results/fig4/_scripts/
 !results/fig4/_scripts/**
-
-# Generated analysis outputs (thoughts branch scripts write here)
-results/analysis/
+!results/fig4/comparison/
+!results/fig4/comparison/**
+!results/fig4/essential_1k/
+results/fig4/essential_1k/**/runs/
+!results/fig4/essential_1k/**/tables/
+!results/fig4/essential_1k/**/figures/
+!results/fig4/essential_1k/**/manifests/
+!results/fig4c/comparison/
+!results/fig4c/comparison/**
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
