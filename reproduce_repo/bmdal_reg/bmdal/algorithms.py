@@ -194,6 +194,32 @@ def kernel_alignment(K1, K2):
     return np.trace(K1 @ K2) / (np.linalg.norm(K1, 'fro') * np.linalg.norm(K2, 'fro'))
 
 
+EARLY_PRIOR_MODEL_WEIGHT = {1: 0.2, 2: 0.3, 3: 0.5, 4: 0.7, 5: 0.8}
+EARLY_MODEL_MODEL_WEIGHT = {1: 0.8, 2: 0.7, 3: 0.5, 4: 0.3, 5: 0.2}
+
+
+def resolve_model_weight(model_weight, weight_schedule, round_id):
+    if weight_schedule == 'early_prior':
+        return EARLY_PRIOR_MODEL_WEIGHT.get(int(round_id or 1), 0.5)
+    if weight_schedule == 'early_model':
+        return EARLY_MODEL_MODEL_WEIGHT.get(int(round_id or 1), 0.5)
+    return float(model_weight)
+
+
+def model_prior_weights(n_kernels, use_prior_only, model_weight):
+    """Priors first, model last (same order as kernel_all)."""
+    if use_prior_only:
+        return [1.0 / n_kernels] * n_kernels
+    n_priors = n_kernels - 1
+    if model_weight < 0:
+        return [1.0 / n_kernels] * n_kernels
+    w_model = min(max(model_weight, 0.0), 1.0)
+    if n_priors <= 0:
+        return [1.0]
+    w_prior = (1.0 - w_model) / n_priors
+    return [w_prior] * n_priors + [w_model]
+
+
 def normalize_kernel(K, mode='diagonal'):
     """
     Normalize the kernel matrix K using the specified method.
@@ -334,7 +360,8 @@ class BatchSelectorImpl:
     """
     def __init__(self, models: List[nn.Module], data: Dict[str, FeatureData], y_train: Optional[torch.Tensor], 
                  train_gold = None, prior_kernel_list = None, use_prior_only = False, integrate_mode = 'mean', 
-                 normalize_mode = 'diag', valid_perts = None, lamb = None, round = None):
+                 normalize_mode = 'diag', valid_perts = None, lamb = None, round = None,
+                 model_weight = -1.0, weight_schedule = 'fixed'):
         """
         :param models: List of trained NNs. Multiple NNs can be provided if ensembling should be used,
         otherwise only one NN should be provided.
@@ -361,6 +388,8 @@ class BatchSelectorImpl:
         self.valid_perts = valid_perts
         self.lamb = lamb
         self.round = round
+        self.model_weight = model_weight
+        self.weight_schedule = weight_schedule
 
     def apply_tfm(self, model_idx: int, tfm: FeaturesTransform):
         """
@@ -628,6 +657,7 @@ class BatchSelectorImpl:
         # compute updated prior kernels
         fusion_weights = None
         kernel_names = None
+        fusion_alignments = None
         if self.prior_kernel_list is not None:
             if self.integrate_mode != 'learn':
                 print('normalizing prior kernel using ' + str(self.normalize_mode))
@@ -657,6 +687,17 @@ class BatchSelectorImpl:
                 kernel_all = self.prior_kernel_list + [base_k]
             else:
                 kernel_all = self.prior_kernel_list
+
+            try:
+                n_train = len(self.features['train'])
+                k_train = [k[-n_train:, -n_train:] for k in kernel_all]
+                fusion_alignments = {
+                    name: float(kernel_alignment(K, self.train_gold))
+                    for name, K in zip(kernel_names, k_train)
+                }
+                print('observed alignments K[S,S] vs gold:', fusion_alignments)
+            except Exception as exc:
+                print('alignment diagnostic skipped:', exc)
 
             if self.integrate_mode == 'mean':
                 print('using mean to integrate across kernels')
@@ -691,7 +732,10 @@ class BatchSelectorImpl:
                 k_agg = np.sum([kernel_all[idx] * i for idx, i in enumerate(coeff)], axis = 0)
             
             elif self.integrate_mode == 'mean_new':
-                weights = [1/len(kernel_all)] * len(kernel_all)
+                w_model = resolve_model_weight(self.model_weight, self.weight_schedule, self.round)
+                weights = model_prior_weights(len(kernel_all), self.use_prior_only, w_model)
+                print(f'using weighted mean (schedule={self.weight_schedule}, model_weight={w_model}, round={self.round})')
+                print('weights: ', weights)
                 fusion_weights = {name: float(w) for name, w in zip(kernel_names, weights)}
                 k_agg = np.zeros_like(kernel_all[0])
                 for K, w in zip(kernel_all, weights):
@@ -705,14 +749,16 @@ class BatchSelectorImpl:
             elif self.integrate_mode == 'alignment':
                 if self.valid_perts is not None:
                     print('Using validation perts in algorithms.py')
-                    #raise ValueError
                     kernel_sub = [k[self.valid_perts, :][:, self.valid_perts].reshape(len(self.valid_perts), len(self.valid_perts)) for k in kernel_all]
                 else:
                     kernel_sub = [k[-len(self.features['train']):,-len(self.features['train']):] for k in kernel_all]
 
-                alignments = [kernel_alignment(K, self.train_gold) for K in kernel_sub]
-                weights = np.array(alignments) / np.sum(alignments)  # normalize to make them sum to 1
+                alignments = [float(kernel_alignment(K, self.train_gold)) for K in kernel_sub]
+                fusion_alignments = {name: a for name, a in zip(kernel_names, alignments)}
+                weights = np.array(alignments, dtype=float)
+                weights = weights / np.sum(weights)
                 fusion_weights = {name: float(w) for name, w in zip(kernel_names, weights)}
+                print('alignments: ', fusion_alignments)
                 print('weights: ', weights)
                 k_agg = np.zeros_like(kernel_all[0])
                 for K, w in zip(kernel_all, weights):
@@ -835,16 +881,21 @@ class BatchSelectorImpl:
         elif selection_method == 'maxdist_prior':
             k_agg = torch.tensor(k_agg).to(self.device)
             if config.get('selection_log', False):
+                logged_config = dict(config)
+                pool_gene_names = logged_config.pop('pool_gene_names', None)
+                snapshot_steps = logged_config.pop('snapshot_steps', (0, 10, 50, 99))
+                logged_config.pop('selection_log', None)
+                logged_config.pop('prior_kernel_names', None)
                 alg = LoggedMaxDistSelectionMethodwithPrior(
                     self.features['pool'],
                     self.features['train'],
                     prior=k_agg,
                     component_kernels=kernel_all if self.prior_kernel_list is not None else [],
                     kernel_names=kernel_names if self.prior_kernel_list is not None else [],
-                    pool_gene_names=config.get('pool_gene_names'),
+                    pool_gene_names=pool_gene_names,
                     prior_weights=fusion_weights,
-                    snapshot_steps=config.get('snapshot_steps', (0, 10, 50, 99)),
-                    **config,
+                    snapshot_steps=snapshot_steps,
+                    **logged_config,
                 )
             else:
                 alg = MaxDistSelectionMethodwithPrior(self.features['pool'], self.features['train'], prior = k_agg, **config)
@@ -894,11 +945,14 @@ class BatchSelectorImpl:
             results_dict['selection_log'] = alg.get_selection_log()
         if fusion_weights is not None:
             results_dict['fusion_weights'] = fusion_weights
+        if fusion_alignments is not None:
+            results_dict['alignments'] = fusion_alignments
         if self.prior_kernel_list is not None and self.integrate_mode != 'learn':
             results_dict['round_state'] = {
                 'base_kernel': base_k if not self.use_prior_only else None,
                 'kernel_names': kernel_names,
                 'integrate_mode': self.integrate_mode,
+                'alignments': fusion_alignments,
             }
 
         torch.backends.cuda.matmul.allow_tf32 = allow_tf32_before

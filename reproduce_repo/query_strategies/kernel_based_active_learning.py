@@ -24,7 +24,8 @@ class kernel_based_active_learning(Strategy):
                  normalize_kernel = False, normalize_method = None, add_ctrl = False, 
                  prior_feat_list = None, gene_hvg_idx = None, lamb = None,
                  prior_kernel_names = None, selection_log = False,
-                 selection_log_dir = DEFAULT_SELECTION_LOG_DIR, run_id = None, seed = None):
+                 selection_log_dir = DEFAULT_SELECTION_LOG_DIR, run_id = None, seed = None,
+                 model_weight = -1.0, weight_schedule = 'fixed'):
         super(kernel_based_active_learning, self).__init__(dataset, net)
         self.selection_method = selection_method
         self.base_kernel = base_kernel
@@ -49,6 +50,9 @@ class kernel_based_active_learning(Strategy):
         self.selection_log_dir = selection_log_dir
         self.run_id = run_id
         self.seed = seed
+        self.model_weight = model_weight
+        self.weight_schedule = weight_schedule
+        self.last_pearson = None
 
     def _save_selection_logs(self, save_name, round_id, n_labeled_before, pool_list, train_list, results_dict):
         os.makedirs(self.selection_log_dir, exist_ok=True)
@@ -63,6 +67,9 @@ class kernel_based_active_learning(Strategy):
             "n_labeled_before": n_labeled_before,
             "strategy": self.selection_method,
             "integrate_mode": self.integrate_mode,
+            "pearson_before_query": self.last_pearson,
+            "model_weight": self.model_weight,
+            "weight_schedule": self.weight_schedule,
         }
         if results_dict.get("fusion_weights") is not None:
             meta["fusion_weights"] = results_dict["fusion_weights"]
@@ -224,7 +231,8 @@ class kernel_based_active_learning(Strategy):
                 
             bs = BatchSelectorImpl([self.net], {'train': train_data, 'pool': pool_data}, 0, train_gold = train_gold, prior_kernel_list = prior_kernel_list_reindex, 
                         use_prior_only = self.use_prior_only, integrate_mode = self.integrate_mode, normalize_mode = self.normalize_mode, valid_perts = valid_perts, 
-                        lamb = self.lamb, round = round)
+                        lamb = self.lamb, round = round,
+                        model_weight = self.model_weight, weight_schedule = self.weight_schedule)
             select_kwargs = dict(
                 selection_method=self.selection_method + '_prior',
                 sel_with_train=self.sel_with_train,

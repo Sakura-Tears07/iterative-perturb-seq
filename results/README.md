@@ -11,11 +11,15 @@ results/
 ├── fig4c/                         # 论文 Fig.4c 单 prior 消融
 │   ├── single_prior/{prior}/runs/ # 每个 prior 5× metrics.csv
 │   └── comparison/                # 8 prior 对比曲线
-├── pilot/                         # thoughts 分支 P1 机制实验（非论文主复现）
-│   ├── iterpert_runs/             # alignment/dup/prior_only 等 smoke
-│   └── selection_logs/            # --selection_log 诊断 CSV
-├── analysis/                      # E0 离线分析（thoughts 分支脚本产出）
+├── analysis/                      # E0 / Idea 2 离线表
 └── README.md
+```
+
+Line B:
+
+```bash
+python scripts/analyze_weight_sweep.py
+python scripts/analyze_existing_nalc.py
 ```
 
 ## 维护命令
@@ -32,4 +36,4 @@ python reproduce_repo/aggregate_fig4_results.py
 python reproduce_repo/aggregate_fig4c_results.py
 ```
 
-**注意**：`pilot/` 和 `analysis/` 不属于论文 Fig.4 主实验，不要与 `fig4/essential_1k/` 混放。
+**注意**：`analysis/` 不属于论文 Fig.4 主实验，不要与 `fig4/essential_1k/` 混放。

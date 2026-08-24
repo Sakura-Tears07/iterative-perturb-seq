@@ -30,7 +30,7 @@ parser.add_argument('--wb_proj_name', type=str, default='active_gears', help="cu
 parser.add_argument('--wb_exp_name', type=str, default='gears', help="cuda device")
 parser.add_argument('--model_name', type=str, default='GEARS', choices = ['GEARS', 'scGPT'])
 
-parser.add_argument('--device', type=str, default='cuda:1', help="cuda device")
+parser.add_argument('--device', type=str, default='cuda:0', help="cuda device (use cuda:0 with CUDA_VISIBLE_DEVICES)")
 parser.add_argument('--n_init_labeled', type=int, default=10, help="number of init labeled samples")
 parser.add_argument('--n_query', type=int, default=10, help="number of queries per round")
 parser.add_argument('--n_round', type=int, default=10, help="number of rounds")
@@ -118,6 +118,10 @@ parser.add_argument('--duplicate_prior', type=str, default='')
 parser.add_argument('--duplicate_copies', type=int, default=1)
 parser.add_argument('--corrupt_prior', type=str, default='')
 parser.add_argument('--corrupt_mode', type=str, choices=['permute', 'none'], default='none')
+parser.add_argument('--model_weight', type=float, default=-1.0,
+                    help="Weight on the model kernel; remaining mass is split equally across priors. <0 = equal mean")
+parser.add_argument('--weight_schedule', type=str, choices=['fixed', 'early_prior', 'early_model'], default='fixed',
+                    help="fixed: use --model_weight every round; early_prior: small w_model then larger; early_model: opposite")
 
 args = parser.parse_args()
 
@@ -199,6 +203,11 @@ if args.duplicate_prior:
 
 if args.corrupt_prior and args.corrupt_mode != 'none':
     args.wb_exp_name += f'_corrupt_{args.corrupt_mode}_{args.corrupt_prior.replace("_kernel", "")}'
+
+if args.weight_schedule != 'fixed':
+    args.wb_exp_name += f'_sched_{args.weight_schedule}'
+elif args.model_weight >= 0:
+    args.wb_exp_name += f'_mw{args.model_weight}'
 
 if args.sample_cells_training:
     args.wb_exp_name += '_sct'
@@ -455,7 +464,9 @@ if args.use_prior:
                                                     prior_kernel_names = [k.replace('_kernel', '') for k in kernel_list],
                                                     selection_log = args.selection_log,
                                                     selection_log_dir = args.selection_log_dir,
-                                                    run_id = args.run, seed = args.seed)
+                                                    run_id = args.run, seed = args.seed,
+                                                    model_weight = args.model_weight,
+                                                    weight_schedule = args.weight_schedule)
     elif args.strategy_name in ['KMeansSampling', 'MaxDist', 'TypiClust']:
         strategy = get_strategy(args.strategy_name)(dataset, net, args.base_kernel, use_prior_only = args.use_prior_only, 
                                                     integrate_mode = args.integrate_mode, normalize_mode = args.normalize_mode, 
@@ -514,6 +525,8 @@ def record_round_metrics(round_idx, n_labeled, eval_out):
     round_metrics.append(row)
     if 'pearson_delta' in row:
         print(f"Round {round_idx} pearson delta: {row['pearson_delta']}")
+        if hasattr(strategy, 'last_pearson'):
+            strategy.last_pearson = row['pearson_delta']
 
 
 # round 0 accuracy
@@ -563,7 +576,7 @@ for rd in range(1, args.n_round+1):
             valid_perts = strategy.net.gears_model.valid_perts
             query_idxs = strategy.query(args.n_query, args.save_kernel, args.wb_exp_name + '_round' + str(rd), valid_perts, round = rd)
         else:
-            query_idxs = strategy.query(args.n_query, args.save_kernel, args.wb_exp_name + '_round' + str(rd), round = rd + 1)
+            query_idxs = strategy.query(args.n_query, args.save_kernel, args.wb_exp_name + '_round' + str(rd), round = rd)
     try:
         round2query[rd] = dataset.pert_train[query_idxs]
     except:

@@ -4,27 +4,29 @@ This fork uses three branches with distinct roles.
 
 | Branch | Base | Purpose |
 |--------|------|---------|
-| `master` | Upstream IterPert | Original paper code; do not add local reproduction or experiment changes here. |
-| `dev` | `master` | **Local reproducibility**: configurable paths, Fig.4 metrics export, results directory layout, preprocessing helpers. Does **not** change core active-learning logic in `bmdal_reg/`. |
-| `thoughts` | `dev` | **Experimental extensions**: selection logging, offline analysis scripts, adaptive-fusion pilots. Safe to iterate; not required for baseline reproduction. |
+| `master` | Upstream IterPert | Original paper code. Do not add local reproduction or experiment changes. |
+| `dev` | `master` | **Line A — reproduction.** Configurable paths, Fig.4/4c metrics export, results layout. Does **not** change core AL logic in `bmdal_reg/`. |
+| `thoughts` | `dev` | **Line B — round-dependent fusion weights.** `--model_weight` / `--weight_schedule` on top of paper `mean_new`. |
 
-## Typical workflow
+Fig.6 GW reproduction is **deferred** (author embeddings unavailable). It does not block Line B.
+
+## Workflow
 
 ```bash
-# Reproduce Fig.4 Essential 1K (paths + metrics only)
+# Line A — paper reproduction
 git checkout dev
 cd reproduce_repo
-python run.py ...   # outputs under results/fig4/...
+python run.py ...   # results/fig4, results/fig4c
 
-# Run mechanism / diagnostic experiments
+# Line B — fusion-weight experiments
 git checkout thoughts
-python scripts/analyze_existing_nalc.py
-bash configs/experiments/p1_pilot/run_pilot.sh
+PARALLEL=1 bash configs/experiments/idea2_weight_sweep/run_sweep.sh
+python scripts/analyze_weight_sweep.py
 ```
 
-## Environment
+Current question and results: [`RESEARCH.md`](RESEARCH.md).
 
-Set data root before running (default `/data/zy/iterpert`):
+## Environment
 
 ```bash
 export ITERPERT_DATA_ROOT=/data/zy/iterpert
