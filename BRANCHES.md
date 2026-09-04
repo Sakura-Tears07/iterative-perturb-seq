@@ -6,7 +6,7 @@ This fork uses three branches with distinct roles.
 |--------|------|---------|
 | `master` | Upstream IterPert | Original paper code. Do not add local reproduction or experiment changes. |
 | `dev` | `master` | **Line A — reproduction.** Configurable paths, Fig.4/4c metrics export, results layout. Does **not** change core AL logic in `bmdal_reg/`. |
-| `thoughts` | `dev` | **Line B — round-dependent fusion weights.** `--model_weight` / `--weight_schedule` on top of paper `mean_new`. |
+| `thoughts` | `dev` | **Line B.** Idea 3 Gate A + D-Gate A. **Now Idea 3c:** Observed-KA hard reject vs equal vs oracle (held-out perm). |
 
 Fig.6 GW reproduction is **deferred** (author embeddings unavailable). It does not block Line B.
 
@@ -18,13 +18,14 @@ git checkout dev
 cd reproduce_repo
 python run.py ...   # results/fig4, results/fig4c
 
-# Line B — fusion-weight experiments
+# Line B — Idea 3c hard reject
 git checkout thoughts
-PARALLEL=1 bash configs/experiments/idea2_weight_sweep/run_sweep.sh
-python scripts/analyze_weight_sweep.py
+python scripts/analyze_hard_reject_threshold.py
+PARALLEL=1 bash configs/experiments/idea3_intervention/run_hard_reject.sh
+python scripts/analyze_idea3_intervention.py
 ```
 
-Current question and results: [`RESEARCH.md`](RESEARCH.md).
+Current question: [`RESEARCH.md`](RESEARCH.md).
 
 ## Environment
 

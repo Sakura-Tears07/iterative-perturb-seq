@@ -1,13 +1,21 @@
-# Experiment outputs: track summaries, ignore raw runs
+# Experiment outputs: track summaries + Idea 2/3 metrics; ignore raw dumps
 results/*
 !results/README.md
+!results/REPRODUCTION_SUMMARY.md
 !results/fig4/
 !results/fig4c/
-results/**/runs/
+!results/analysis/
+!results/analysis/**
+!results/idea2/
+!results/idea2/**
+!results/idea3/
+!results/idea3/**
+
 results/**/*.pkl
-results/analysis/
 results/pilot/
 results/selection_logs/
+results/round_states/
+
 !results/fig4/_scripts/
 !results/fig4/_scripts/**
 !results/fig4/comparison/
@@ -19,7 +27,7 @@ results/fig4/essential_1k/**/runs/
 !results/fig4/essential_1k/**/manifests/
 !results/fig4c/comparison/
 !results/fig4c/comparison/**
-!results/REPRODUCTION_SUMMARY.md
+results/fig4c/**/runs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

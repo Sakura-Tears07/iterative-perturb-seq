@@ -1,0 +1,7 @@
+metric_a,metric_b,spearman_rank_corr
+uncentered,centered_cka,0.7999999999999999
+uncentered,centered_cka_zero_diag,0.6
+uncentered,code_kernel_alignment,1.0
+centered_cka,centered_cka_zero_diag,0.8333333333333333
+centered_cka,code_kernel_alignment,0.7999999999999999
+centered_cka_zero_diag,code_kernel_alignment,0.6

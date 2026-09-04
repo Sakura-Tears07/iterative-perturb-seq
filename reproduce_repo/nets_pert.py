@@ -44,6 +44,16 @@ class Net:
             self.scgpt_model.model_initialize()
             self.scgpt_model.train(epochs = self.params['epoch_per_cycle'], lr = 1e-4, data = data)
 
+    def save_checkpoint(self, path):
+        if self.model != 'GEARS':
+            raise ValueError('save_checkpoint currently only supports GEARS')
+        self.gears_model.save_model(path)
+
+    def load_checkpoint(self, path):
+        if self.model != 'GEARS':
+            raise ValueError('load_checkpoint currently only supports GEARS')
+        self.gears_model.load_pretrained(path)
+
     def predict(self, data, detail_eval = False):
         if self.model == 'GEARS':
             return self.gears_model.predict_from_loader(data, detail_eval)

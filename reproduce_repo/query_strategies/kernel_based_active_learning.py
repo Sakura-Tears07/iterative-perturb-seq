@@ -25,7 +25,9 @@ class kernel_based_active_learning(Strategy):
                  prior_feat_list = None, gene_hvg_idx = None, lamb = None,
                  prior_kernel_names = None, selection_log = False,
                  selection_log_dir = DEFAULT_SELECTION_LOG_DIR, run_id = None, seed = None,
-                 model_weight = -1.0, weight_schedule = 'fixed'):
+                 model_weight = -1.0, weight_schedule = 'fixed',
+                 detect_drop = False, detect_tau = -1.0, detect_target = 'rpe1',
+                 detect_min_round = 1):
         super(kernel_based_active_learning, self).__init__(dataset, net)
         self.selection_method = selection_method
         self.base_kernel = base_kernel
@@ -52,6 +54,10 @@ class kernel_based_active_learning(Strategy):
         self.seed = seed
         self.model_weight = model_weight
         self.weight_schedule = weight_schedule
+        self.detect_drop = bool(detect_drop)
+        self.detect_tau = float(detect_tau)
+        self.detect_target = str(detect_target)
+        self.detect_min_round = int(detect_min_round)
         self.last_pearson = None
 
     def _save_selection_logs(self, save_name, round_id, n_labeled_before, pool_list, train_list, results_dict):
@@ -246,6 +252,13 @@ class kernel_based_active_learning(Strategy):
                     'pool_gene_names': pool_list,
                     'prior_kernel_names': self.prior_kernel_names,
                     'snapshot_steps': (0, 10, 50, 99),
+                })
+            if self.detect_drop:
+                select_kwargs.update({
+                    'detect_drop': True,
+                    'detect_tau': self.detect_tau,
+                    'detect_target': self.detect_target,
+                    'detect_min_round': self.detect_min_round,
                 })
             new_idxs, results_dict = bs.select(**select_kwargs)
             if self.selection_log and save_name is not None:

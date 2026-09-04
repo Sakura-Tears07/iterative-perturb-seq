@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-# P1 pilot matrix: 6 methods x 3 seeds = 18 campaigns
+# SUPERSEDED by configs/experiments/idea3_corruption/run_pilot.sh
+# P1 pilot matrix (do not launch).
+#
+# Naming:
+#   prior_only  = --use_prior --use_prior_only   (priors only, no model kernel)
+#   model_only  = --use_prior --model_weight 1.0 (model kernel only)
+# Older logs named model_only_* were actually prior-only. Do not reuse that tag.
 set -euo pipefail
 
 REPO="/home/zy/workspace/iterative-perturb-seq/reproduce_repo"
@@ -41,8 +47,11 @@ for run_id in 1 2 3; do
   run_one iterpert_alignment 1 "$run_id" \
     --use_prior --integrate_mode alignment --normalize_mode diag
 
-  run_one model_only 1 "$run_id" \
+  run_one prior_only 1 "$run_id" \
     --use_prior --use_prior_only --integrate_mode mean_new --normalize_mode max
+
+  run_one model_only 1 "$run_id" \
+    --use_prior --integrate_mode mean_new --normalize_mode max --model_weight 1.0
 
   run_one single_rpe1 1 "$run_id" \
     --use_prior --use_single_prior --single_prior rpe1_kernel \

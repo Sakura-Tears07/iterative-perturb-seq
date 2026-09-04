@@ -699,6 +699,28 @@ class BatchSelectorImpl:
             except Exception as exc:
                 print('alignment diagnostic skipped:', exc)
 
+            if config.get('detect_drop') and fusion_alignments is not None:
+                tau = float(config.get('detect_tau'))
+                target = str(config.get('detect_target', 'rpe1'))
+                min_rd = int(config.get('detect_min_round', 1))
+                rd = int(self.round or 1)
+                if target == 'model':
+                    print('Detect drop refused: will not reject the model kernel')
+                elif rd >= min_rd and target in fusion_alignments:
+                    z = float(fusion_alignments[target])
+                    if z < tau:
+                        keep_idx = [i for i, name in enumerate(kernel_names) if name != target]
+                        kernel_all = [kernel_all[i] for i in keep_idx]
+                        kernel_names = [kernel_names[i] for i in keep_idx]
+                        print(f'Detect reject {target}: z={z:.6f} < tau={tau:.6f} round={rd} kept={kernel_names}')
+                    else:
+                        print(f'Detect keep {target}: z={z:.6f} >= tau={tau:.6f} round={rd}')
+                elif rd < min_rd:
+                    print(f'Detect skipped until round {min_rd} (current {rd})')
+
+            for _k in ('detect_drop', 'detect_tau', 'detect_target', 'detect_min_round'):
+                config.pop(_k, None)
+
             if self.integrate_mode == 'mean':
                 print('using mean to integrate across kernels')
                 if not self.use_prior_only:

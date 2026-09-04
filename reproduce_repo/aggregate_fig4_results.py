@@ -32,6 +32,8 @@ METHODS = {
             and "dup" not in f
             and "alignment" not in f
             and "prior_only" not in f
+            and "_mw" not in f
+            and "_sched_" not in f
         ),
         "color": "#d62728",
     },

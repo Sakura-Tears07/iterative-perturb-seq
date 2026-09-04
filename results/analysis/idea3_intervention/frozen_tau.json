@@ -1,0 +1,45 @@
+{
+  "signal": "obs",
+  "action": "drop RPE1 only",
+  "detect_from_round": 1,
+  "tau": 0.4512449421097154,
+  "fpr_budget": 0.1,
+  "rule": "FPR<=0.10",
+  "cal_perms": [
+    20260826,
+    20260827,
+    20260828
+  ],
+  "val_perm": 20260829,
+  "offline_holdout_perm": 20260830,
+  "gpu_test_perm": 20260831,
+  "calibration": {
+    "n_clean": 45,
+    "n_bad": 45,
+    "n_mid": 45,
+    "FPR_clean": 0.0,
+    "TPR_bad": 1.0,
+    "reject_mid": 0.2222222222222222,
+    "keep_clean": 1.0
+  },
+  "validation_do_not_retune": {
+    "n_clean": 15,
+    "n_bad": 15,
+    "n_mid": 15,
+    "FPR_clean": 0.0,
+    "TPR_bad": 1.0,
+    "reject_mid": 0.2,
+    "keep_clean": 1.0
+  },
+  "offline_holdout_do_not_retune": {
+    "n_clean": 15,
+    "n_bad": 15,
+    "n_mid": 15,
+    "FPR_clean": 0.0,
+    "TPR_bad": 1.0,
+    "reject_mid": 0.3333333333333333,
+    "keep_clean": 1.0
+  },
+  "lambda_0.5_not_used_for_tau": true,
+  "launch_gpu": true
+}

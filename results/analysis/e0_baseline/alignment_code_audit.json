@@ -1,0 +1,25 @@
+{
+  "findings": [
+    {
+      "check": "train_gold_labeled_only",
+      "status": "PASS",
+      "detail": "Non-learn modes slice train_gold to labeled perturbations only before fusion."
+    },
+    {
+      "check": "alignment_kernel_sub_labeled_block",
+      "status": "PASS",
+      "detail": "Alignment compares kernels on the labeled block only."
+    },
+    {
+      "check": "learn_mode_full_train_gold_inference",
+      "status": "WARN",
+      "detail": "integrate_mode=learn uses full precomputed train_gold during inference weight prediction."
+    },
+    {
+      "check": "alignment_formula",
+      "status": "WARN",
+      "detail": "Uses uncentered Frobenius cosine (trace / fro norms), diagonal-dominated for similarity kernels."
+    }
+  ],
+  "kernel_alignment_source": "def kernel_alignment(K1, K2):\n    \"\"\"\n    Compute the alignment between two kernel matrices.\n    \"\"\"\n    return np.trace(K1 @ K2) / (np.linalg.norm(K1, 'fro') * np.linalg.norm(K2, 'fro'))"
+}

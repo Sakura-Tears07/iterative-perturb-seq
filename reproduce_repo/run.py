@@ -118,10 +118,34 @@ parser.add_argument('--duplicate_prior', type=str, default='')
 parser.add_argument('--duplicate_copies', type=int, default=1)
 parser.add_argument('--corrupt_prior', type=str, default='')
 parser.add_argument('--corrupt_mode', type=str, choices=['permute', 'none'], default='none')
+parser.add_argument('--corrupt_lambda', type=float, default=1.0,
+                    help="K_λ = (1-λ)K + λ P K P^T. 0=clean, 1=full permutation")
+parser.add_argument('--corrupt_seed', type=int, default=20260826,
+                    help="Fixed permutation seed (independent of campaign --seed/--run)")
+parser.add_argument('--drop_prior', type=str, default='',
+                    help="Oracle diagnostic: remove this prior from equal fusion")
+parser.add_argument('--detect_drop', action='store_true', default=False,
+                    help="Hard-reject a prior when Observed KA on S_t is below --detect_tau")
+parser.add_argument('--detect_tau', type=float, default=-1.0,
+                    help="Reject if z < tau. Frozen in results/analysis/idea3_intervention/frozen_tau.json")
+parser.add_argument('--detect_target', type=str, default='rpe1',
+                    help="Prior name in fusion_alignments (without _kernel). v1 = rpe1 only")
+parser.add_argument('--detect_min_round', type=int, default=1,
+                    help="First round id that may reject (1 = first acquisition)")
+parser.add_argument('--result_tag', type=str, default='',
+                    help="If set, write metrics under results/<tag>/runs")
 parser.add_argument('--model_weight', type=float, default=-1.0,
                     help="Weight on the model kernel; remaining mass is split equally across priors. <0 = equal mean")
 parser.add_argument('--weight_schedule', type=str, choices=['fixed', 'early_prior', 'early_model'], default='fixed',
                     help="fixed: use --model_weight every round; early_prior: small w_model then larger; early_model: opposite")
+parser.add_argument('--labeled_genes_file', type=str, default='',
+                    help="Start from this labeled gene list (common-state fork)")
+parser.add_argument('--load_checkpoint', type=str, default='',
+                    help="Load GEARS checkpoint (config.pkl + model.pt) and skip initial train")
+parser.add_argument('--dump_state_dir', type=str, default='',
+                    help="If set, after each train dump labeled/pool genes + GEARS checkpoint under this dir")
+parser.add_argument('--dump_n_labeled', type=str, default='100,300,500',
+                    help="Comma-separated n_labeled values to dump when --dump_state_dir is set")
 
 args = parser.parse_args()
 
@@ -201,13 +225,33 @@ if add_ctrl:
 if args.duplicate_prior:
     args.wb_exp_name += f'_dup{args.duplicate_copies}_{args.duplicate_prior.replace("_kernel", "")}'
 
+if args.drop_prior:
+    args.wb_exp_name += f'_drop_{args.drop_prior.replace("_kernel", "")}'
+
+if args.detect_drop:
+    args.wb_exp_name += (
+        f'_detect_{args.detect_target}_t{float(args.detect_tau):.4f}_r{int(args.detect_min_round)}'
+    )
+
 if args.corrupt_prior and args.corrupt_mode != 'none':
-    args.wb_exp_name += f'_corrupt_{args.corrupt_mode}_{args.corrupt_prior.replace("_kernel", "")}'
+    args.wb_exp_name += (
+        f'_corrupt_{args.corrupt_mode}_{args.corrupt_prior.replace("_kernel", "")}'
+        f'_l{float(args.corrupt_lambda):g}_cs{int(args.corrupt_seed)}'
+    )
 
 if args.weight_schedule != 'fixed':
     args.wb_exp_name += f'_sched_{args.weight_schedule}'
 elif args.model_weight >= 0:
     args.wb_exp_name += f'_mw{args.model_weight}'
+
+if args.labeled_genes_file:
+    args.wb_exp_name += '_fork'
+    if args.load_checkpoint:
+        # Encode source state n if present in path (.../n300/...)
+        import re as _re
+        m = _re.search(r'/n(\d+)/', args.load_checkpoint.replace('\\', '/') + '/')
+        if m:
+            args.wb_exp_name += f'_n{m.group(1)}'
 
 if args.sample_cells_training:
     args.wb_exp_name += '_sct'
@@ -416,6 +460,13 @@ if args.use_prior:
                        'biogpt_kernel', 'node2vec_kernel', 'ops_A549_kernel',
                        'ops_HeLa_HPLM_kernel', 'ops_HeLa_DMEM_kernel']
 
+    if args.drop_prior:
+        before = list(kernel_list)
+        kernel_list = [k for k in kernel_list if k != args.drop_prior]
+        print(f'Dropped prior {args.drop_prior}: {before} -> {kernel_list}')
+        if not kernel_list:
+            raise ValueError(f'--drop_prior {args.drop_prior} left an empty kernel list')
+
     if args.duplicate_prior:
         expanded = []
         for kernel_name in kernel_list:
@@ -425,12 +476,36 @@ if args.use_prior:
                 expanded.append(kernel_name)
         kernel_list = expanded
 
+    def load_or_make_perm(n):
+        perm_dir = os.path.join(DATA_ROOT, 'idea3')
+        os.makedirs(perm_dir, exist_ok=True)
+        path = os.path.join(perm_dir, f'perm_seed{int(args.corrupt_seed)}_n{int(n)}.npy')
+        if os.path.isfile(path):
+            perm = np.load(path)
+            if int(perm.shape[0]) != int(n):
+                raise ValueError(f'Permutation {path} has len {perm.shape[0]}, expected {n}')
+            return perm
+        rng = np.random.default_rng(int(args.corrupt_seed))
+        perm = rng.permutation(int(n))
+        np.save(path, perm)
+        print(f'Saved fixed corruption permutation to {path}')
+        return perm
+
     def maybe_corrupt_kernel(kernel_name, kernel_npy):
-        if args.corrupt_prior and kernel_name == args.corrupt_prior and args.corrupt_mode == 'permute':
-            rng = np.random.default_rng(args.seed)
-            perm = rng.permutation(kernel_npy.shape[0])
-            return kernel_npy[np.ix_(perm, perm)]
-        return kernel_npy
+        if not (args.corrupt_prior and kernel_name == args.corrupt_prior and args.corrupt_mode == 'permute'):
+            return kernel_npy
+        lam = float(args.corrupt_lambda)
+        if lam <= 0:
+            print(f'Corrupt {kernel_name}: λ=0, kernel unchanged')
+            return kernel_npy
+        perm = load_or_make_perm(kernel_npy.shape[0])
+        k_perm = kernel_npy[np.ix_(perm, perm)]
+        mixed = k_perm if lam >= 1 else (1.0 - lam) * kernel_npy + lam * k_perm
+        print(
+            f'Corrupt {kernel_name}: K_λ=(1-λ)K+λPKP^T  λ={lam} '
+            f'seed={int(args.corrupt_seed)} perm[:8]={perm[:8].tolist()}'
+        )
+        return mixed
 
     prior_kernel_list, prior_feat_list = [],[] 
     
@@ -466,7 +541,11 @@ if args.use_prior:
                                                     selection_log_dir = args.selection_log_dir,
                                                     run_id = args.run, seed = args.seed,
                                                     model_weight = args.model_weight,
-                                                    weight_schedule = args.weight_schedule)
+                                                    weight_schedule = args.weight_schedule,
+                                                    detect_drop = args.detect_drop,
+                                                    detect_tau = args.detect_tau,
+                                                    detect_target = args.detect_target,
+                                                    detect_min_round = args.detect_min_round)
     elif args.strategy_name in ['KMeansSampling', 'MaxDist', 'TypiClust']:
         strategy = get_strategy(args.strategy_name)(dataset, net, args.base_kernel, use_prior_only = args.use_prior_only, 
                                                     integrate_mode = args.integrate_mode, normalize_mode = args.normalize_mode, 
@@ -496,7 +575,13 @@ else:
         strategy = get_strategy(args.strategy_name)(dataset, net)  # load strategy
 
 # start experiment
-init_idx = dataset.initialize_labels(args.n_init_labeled)
+if args.labeled_genes_file:
+    with open(args.labeled_genes_file) as f:
+        gene_names = [line.strip() for line in f if line.strip()]
+    init_idx = dataset.initialize_from_genes(gene_names)
+    args.n_init_labeled = int(len(init_idx))
+else:
+    init_idx = dataset.initialize_labels(args.n_init_labeled)
 print(f"number of labeled pool: {args.n_init_labeled}")
 print(f"number of unlabeled pool: {dataset.n_pool-args.n_init_labeled}")
 print(f"number of testing pool: {dataset.n_test}")
@@ -509,6 +594,48 @@ metrics = ['pearson_delta',
             'pearson_delta_top20_de_non_dropout', 'mse_4_non_dropout', 'mse_4_top20_de_non_dropout']
 
 round_metrics = []
+DUMP_NS = {int(x) for x in args.dump_n_labeled.split(',') if x.strip()} if args.dump_state_dir else set()
+
+
+def dump_common_state(n_labeled, round_idx, pearson_before=None):
+    if not args.dump_state_dir or int(n_labeled) not in DUMP_NS:
+        return
+    state_dir = os.path.join(args.dump_state_dir, f'n{int(n_labeled)}')
+    os.makedirs(state_dir, exist_ok=True)
+    labeled_idxs = np.where(dataset.labeled_idxs)[0]
+    pool_idxs = np.where(~dataset.labeled_idxs)[0]
+    labeled_genes = [str(g) for g in dataset.pert_train[labeled_idxs]]
+    pool_genes = [str(g) for g in dataset.pert_train[pool_idxs]]
+    with open(os.path.join(state_dir, 'labeled_genes.txt'), 'w') as f:
+        f.write('\n'.join(labeled_genes) + '\n')
+    with open(os.path.join(state_dir, 'pool_genes.txt'), 'w') as f:
+        f.write('\n'.join(pool_genes) + '\n')
+    ckpt_dir = os.path.join(state_dir, 'gears_checkpoint')
+    strategy.net.save_checkpoint(ckpt_dir)
+    meta = {
+        'source_wb_exp_name': args.wb_exp_name,
+        'run': args.run,
+        'seed': args.seed,
+        'round': int(round_idx),
+        'n_labeled': int(n_labeled),
+        'pearson_before': pearson_before,
+        'dataset_name': args.dataset_name,
+        'integrate_mode': args.integrate_mode,
+        'normalize_mode': args.normalize_mode,
+        'model_weight': args.model_weight,
+        'weight_schedule': args.weight_schedule,
+        'n_labeled_genes': len(labeled_genes),
+        'n_pool_genes': len(pool_genes),
+        'checkpoint': ckpt_dir,
+        'phase0_commit': 'a06d119',
+    }
+    import json as _json
+    with open(os.path.join(state_dir, 'state_meta.json'), 'w') as f:
+        _json.dump(meta, f, indent=2)
+    if pearson_before is not None:
+        with open(os.path.join(state_dir, 'state_metrics.json'), 'w') as f:
+            _json.dump({'n_labeled': int(n_labeled), 'pearson_before': float(pearson_before)}, f, indent=2)
+    print(f'Dumped common state to {state_dir}')
 
 
 def record_round_metrics(round_idx, n_labeled, eval_out):
@@ -527,11 +654,15 @@ def record_round_metrics(round_idx, n_labeled, eval_out):
         print(f"Round {round_idx} pearson delta: {row['pearson_delta']}")
         if hasattr(strategy, 'last_pearson'):
             strategy.last_pearson = row['pearson_delta']
+    return row.get('pearson_delta')
 
 
 # round 0 accuracy
 print("Round 0")
-if args.batch_exp:
+if args.load_checkpoint:
+    print(f'Loading GEARS checkpoint from {args.load_checkpoint} (skip initial train)')
+    strategy.net.load_checkpoint(args.load_checkpoint)
+elif args.batch_exp:
     genes_available_per_round = {}
     genes_available_per_round[0] = dataset.pert_train[init_idx]
     all_batch_idx = dataset.pert_data.all_batch_idx
@@ -553,7 +684,27 @@ if args.wandb:
     for m in metrics:
         wandb.log({'test_round_' + m: np.mean([j[m] for i,j in out.items() if m in j])})
 
-record_round_metrics(0, args.n_init_labeled, out)
+p0 = record_round_metrics(0, args.n_init_labeled, out)
+if args.load_checkpoint:
+    dump_metrics = os.path.join(os.path.dirname(args.load_checkpoint.rstrip('/')), 'state_metrics.json')
+    if os.path.isfile(dump_metrics):
+        import json as _json
+        dumped_p = _json.loads(open(dump_metrics).read()).get('pearson_before')
+        print(
+            f'Fork P_before dump={dumped_p} eval_after_load={p0} '
+            f'(official P_before uses dump; eval is sanity only)'
+        )
+        if dumped_p is not None:
+            if p0 is not None and abs(float(p0) - float(dumped_p)) > 1e-4:
+                print(f'WARNING: eval_after_load differs from dump P_before by {float(p0) - float(dumped_p)}')
+            round_metrics[-1]['pearson_delta'] = float(dumped_p)
+            round_metrics[-1]['pearson_delta_eval_after_load'] = p0
+            p0 = float(dumped_p)
+            if hasattr(strategy, 'last_pearson'):
+                strategy.last_pearson = p0
+    print(f'Fork checkpoint_path: {args.load_checkpoint}')
+    print(f'Fork training_seed: np={args.seed} torch_run={args.run}')
+dump_common_state(args.n_init_labeled, 0, p0)
 
 
 round2query = {}
@@ -599,11 +750,9 @@ for rd in range(1, args.n_round+1):
         for m in metrics:
             wandb.log({'test_round_' + m: np.mean([j[m] for i,j in out.items() if m in j])})
 
-    record_round_metrics(
-        rd,
-        args.n_init_labeled + rd * args.n_query,
-        out,
-    )
+    n_lab = args.n_init_labeled + rd * args.n_query
+    p = record_round_metrics(rd, n_lab, out)
+    dump_common_state(n_lab, rd, p)
 
 
 import pickle
@@ -622,3 +771,50 @@ with open(metrics_pkl, 'wb') as f:
     pickle.dump(round_metrics, f)
 print(f"Saved query results to {result_base}.pkl")
 print(f"Saved round metrics to {metrics_csv}")
+
+if args.load_checkpoint:
+    import json as _json
+
+    def _genes(obj):
+        if obj is None:
+            return []
+        if hasattr(obj, 'tolist'):
+            obj = obj.tolist()
+        return [str(x) for x in obj]
+
+    p_before = None
+    p_after = None
+    p_eval = None
+    by_round = {int(r['round']): r for r in round_metrics}
+    if 0 in by_round:
+        p_before = by_round[0].get('pearson_delta')
+        p_eval = by_round[0].get('pearson_delta_eval_after_load')
+    if 1 in by_round:
+        p_after = by_round[1].get('pearson_delta')
+    selected = _genes(round2query.get(1))
+    dump_metrics = os.path.join(os.path.dirname(args.load_checkpoint.rstrip('/')), 'state_metrics.json')
+    dump_p = None
+    if os.path.isfile(dump_metrics):
+        dump_p = _json.loads(open(dump_metrics).read()).get('pearson_before')
+        if dump_p is not None:
+            p_before = float(dump_p)
+    record = {
+        'base_run': int(args.run),
+        'base_n_labeled': int(args.n_init_labeled),
+        'w_model': float(args.model_weight),
+        'P_before': p_before,
+        'P_before_eval_after_load': p_eval,
+        'P_after': p_after,
+        'delta_pearson': (None if p_before is None or p_after is None else float(p_after) - float(p_before)),
+        'selected_genes': selected,
+        'n_selected': len(selected),
+        'training_seed': int(args.seed),
+        'training_run': int(args.run),
+        'checkpoint_path': args.load_checkpoint,
+        'labeled_genes_file': args.labeled_genes_file,
+        'wb_exp_name': args.wb_exp_name,
+    }
+    record_path = result_base + '_fork_record.json'
+    with open(record_path, 'w') as f:
+        _json.dump(record, f, indent=2)
+    print(f'Saved fork record to {record_path}')

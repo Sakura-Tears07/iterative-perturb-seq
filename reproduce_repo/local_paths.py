@@ -15,6 +15,10 @@ def resolve_result_dir(args) -> str:
     """Return experiment-specific subdirectory under results/."""
     root = Path(RES_DIR)
 
+    tag = getattr(args, "result_tag", "") or ""
+    if tag:
+        return str(root / tag / "runs")
+
     if getattr(args, "use_single_prior", False):
         prior = getattr(args, "single_prior", "unknown_prior")
         return str(root / "fig4c" / "single_prior" / prior / "runs")
@@ -23,6 +27,17 @@ def resolve_result_dir(args) -> str:
     if "essential" in dataset:
         if getattr(args, "epoch_per_cycle", 20) == 1:
             return str(root / "fig4" / "essential_1k" / "smoke" / "runs")
+
+        if getattr(args, "labeled_genes_file", "") or getattr(args, "load_checkpoint", ""):
+            return str(root / "idea2" / "forks" / "runs")
+
+        mw = float(getattr(args, "model_weight", -1.0))
+        sched = str(getattr(args, "weight_schedule", "fixed"))
+        if mw >= 0 or sched != "fixed":
+            return str(root / "idea2" / "runs")
+
+        if getattr(args, "dump_state_dir", ""):
+            return str(root / "idea2" / "paper_state_dump" / "runs")
 
         if (
             getattr(args, "use_prior", False)

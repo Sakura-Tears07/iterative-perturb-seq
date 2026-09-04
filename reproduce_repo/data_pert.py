@@ -41,11 +41,33 @@ class Data:
 
     def initialize_labels(self, num):
         # generate initial labeled pool
+        # NOTE: seed is hardcoded (42), so all strategies share the same init set
+        # for a given n_init_labeled.
         tmp_idxs = np.arange(self.n_pool)
         np.random.seed(42)
         np.random.shuffle(tmp_idxs)
         self.labeled_idxs[tmp_idxs[:num]] = True
         return tmp_idxs[:num]
+
+    def initialize_from_genes(self, gene_names):
+        """Start from a saved labeled set (common-state forks). Names may be GENE or GENE+ctrl."""
+        wanted = set()
+        for raw in gene_names:
+            g = str(raw).strip()
+            if not g:
+                continue
+            wanted.add(g)
+            wanted.add(g.split('+')[0])
+            if '+' not in g:
+                wanted.add(g + '+ctrl')
+        idxs = [i for i, pert in enumerate(self.pert_train)
+                if pert in wanted or pert.split('+')[0] in wanted]
+        if not idxs:
+            raise ValueError('labeled_genes_file matched 0 perturbations in pert_train')
+        self.labeled_idxs[:] = False
+        self.labeled_idxs[np.array(idxs)] = True
+        print(f'Initialized {len(idxs)} labeled genes from file')
+        return np.array(idxs)
     
     def get_labeled_data(self, batch_exp = None):
         labeled_idxs = np.arange(self.n_pool)[self.labeled_idxs]

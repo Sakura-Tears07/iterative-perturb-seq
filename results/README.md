@@ -11,9 +11,13 @@ results/
 ├── fig4c/                         # 论文 Fig.4c 单 prior 消融
 │   ├── single_prior/{prior}/runs/ # 每个 prior 5× metrics.csv
 │   └── comparison/                # 8 prior 对比曲线
-├── analysis/                      # E0 / Idea 2 离线表
+├── analysis/                      # E0 / Idea 2 / Idea 3 汇总表与门控结论（入库）
+├── idea2/                         # weight sweep / schedule / fork 的 metrics.csv
+├── idea3/                         # corruption / intervention 的 metrics.csv
 └── README.md
 ```
+
+`analysis/`、`idea2/`、`idea3/` 的 csv / md / png / json 跟 `thoughts` 走。`.pkl`、`selection_logs/`、`round_states/` 和 Fig.4/4c 的 raw `runs/` 仍不入库。
 
 Line B:
 

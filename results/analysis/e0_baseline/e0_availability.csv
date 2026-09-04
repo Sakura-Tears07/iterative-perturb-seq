@@ -1,0 +1,11 @@
+method,n_runs_found
+IterPert,10
+Random,10
+Core-Set,10
+BADGE,10
+TypiClust,10
+BALD,10
+LCMD,10
+ACS-FW,10
+BatchBALD,10
+KMeans,10

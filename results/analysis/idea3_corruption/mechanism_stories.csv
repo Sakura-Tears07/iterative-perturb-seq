@@ -1,0 +1,5 @@
+setting,lambda,mean_jaccard,mean_delta_P,mean_rpe1_alignment,story
+full,0.5,0.2745765087159477,0.003977822694010987,0.4199558953444163,"equivalent batches: selection changes, Pearson ~flat"
+full,1.0,0.1997542908940107,0.024104714532893125,0.18197640677293142,mislead: selection changes and Pearson drops
+two_source,0.5,0.11132141619326356,0.0038562846505712472,0.44365044434865314,"equivalent batches: selection changes, Pearson ~flat"
+two_source,1.0,0.04063243547681232,0.02817660170358407,0.23874932726224263,mislead: selection changes and Pearson drops

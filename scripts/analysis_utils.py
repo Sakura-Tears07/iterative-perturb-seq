@@ -19,7 +19,13 @@ KERNEL_ROOT = DATA_ROOT / "knowledge_kernels" / "essential_1k"
 METHODS = {
     "IterPert": {
         "pattern": "*priormean_new_max*Core-Set_diff_effect_metrics.csv",
-        "filter": lambda f: "100_5_100" in f and "single_" not in f,
+        "filter": lambda f: (
+            "100_5_100" in f
+            and "single_" not in f
+            and "_mw" not in f
+            and "_sched_" not in f
+            and "dup" not in f
+        ),
     },
     "Random": {
         "pattern": "*Random_cross_gene_out_metrics.csv",

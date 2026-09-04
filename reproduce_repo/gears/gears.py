@@ -189,11 +189,13 @@ class GEARS:
         self.best_model = deepcopy(self.model)
         
     def load_pretrained(self, path):
+        import inspect
         with open(os.path.join(path, 'config.pkl'), 'rb') as f:
             config = pickle.load(f)
-        
-        del config['device'], config['num_genes'], config['num_perts']
-        self.model_initialize(**config)
+
+        allowed = set(inspect.signature(self.model_initialize).parameters)
+        init_kwargs = {k: v for k, v in config.items() if k in allowed}
+        self.model_initialize(**init_kwargs)
         self.config = config
         
         state_dict = torch.load(os.path.join(path, 'model.pt'), map_location = torch.device('cpu'))

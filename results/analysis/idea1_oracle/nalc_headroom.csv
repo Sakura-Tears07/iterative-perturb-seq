@@ -1,0 +1,7 @@
+curve,nALC,which,note
+Random,0.2074445529519651,,
+Core-Set,0.2139523234104088,,
+IterPert,0.25018094928272133,,
+best_fixed,0.25018094928272133,IterPert,
+independent_trajectory_oracle,0.25168920174498777,,n=100 is init (no AL yet). n=200 is the first same-state query. Later rounds are trajectories.
+oracle_minus_best_fixed,0.001508252462266435,,

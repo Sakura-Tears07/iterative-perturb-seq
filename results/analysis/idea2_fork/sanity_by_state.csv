@@ -1,0 +1,10 @@
+run,state_n,complete,p_before_identical,eval_after_load_identical,n_selected_100,no_overlap_labeled,same_checkpoint,ok,issues,P_before
+1,100,True,True,True,True,True,True,True,,0.1034271140699563
+1,300,True,True,True,True,True,True,True,,0.26085695925545577
+1,500,True,True,True,True,True,True,True,,0.29161252815200006
+2,100,True,True,True,True,True,True,True,,0.11842360705487635
+2,300,True,True,True,True,True,True,True,,0.2539390984716627
+2,500,True,True,True,True,True,True,True,,0.2803237733789004
+3,100,True,True,True,True,True,True,True,,0.10773587566125871
+3,300,True,True,True,True,True,True,True,,0.2471915381344115
+3,500,True,True,True,True,True,True,True,,0.2973024232775409
