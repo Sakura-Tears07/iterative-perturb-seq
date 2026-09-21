@@ -92,6 +92,17 @@ def make_runs(only):
             a += ["--use_prior_only"]
             runs.append((f"iterpert_prior_only_r{run}", run, a,
                          RESULTS / "fig4" / "essential_1k" / "iterpert" / "runs"))
+    if only in ("verif", "all"):
+        # verification re-runs for the uncertainty-based baselines, whose
+        # selection depends on the trained model's gradient features and is
+        # sensitive to torch/hardware differences (see results/LOCAL_VERIFICATION.md).
+        for slug, k in [("bald", "BALD"), ("batchbald", "BatchBALD")]:
+            for run in [2]:
+                runs.append((f"{slug}_r{run}", run,
+                             base_args("kernel_based_active_learning",
+                                       kernel_strategy=k,
+                                       base_kernel="cross_gene_out"),
+                             RESULTS / "fig4" / "essential_1k" / "baselines" / slug / "runs"))
     if only in ("fig4c", "all"):
         for prior in ["pops_kernel", "rpe1_kernel", "esm_kernel", "biogpt_kernel",
                       "node2vec_kernel", "ops_A549_kernel", "ops_HeLa_HPLM_kernel",
@@ -111,7 +122,7 @@ def is_done(run_no, out_dir):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--only", choices=["main", "fig4c", "ablation", "all"], default="all")
+    ap.add_argument("--only", choices=["main", "fig4c", "ablation", "verif", "all"], default="all")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
