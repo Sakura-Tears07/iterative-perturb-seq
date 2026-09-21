@@ -184,3 +184,7 @@ cython_debug/
 
 
 
+
+# scheduler/launcher logs
+results/**/_scripts/logs/
+results/**/scheduler_stdout.log
