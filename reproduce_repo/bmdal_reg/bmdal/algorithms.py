@@ -685,6 +685,46 @@ class BatchSelectorImpl:
                 k_agg = np.zeros_like(kernel_all[0])
                 for K, w in zip(kernel_all, weights):
                     k_agg += w * K
+            elif self.integrate_mode in ('softmax_align', 'best_align', 'ridge_lab'):
+                # ------------------------------------------------------------------
+                # EXP-1 extension (see experiments/README.md): adaptive fusion
+                # operators that fit weights on the LABELLED subset only, so they
+                # are deployable online (no validation/test labels used).
+                #   softmax_align : softmax over kernel alignment (keeps weak
+                #                   priors alive, unlike 'alignment')
+                #   best_align    : one-hot on the best-aligned kernel
+                #   ridge_lab     : non-negative ridge regression of the truth
+                #                   sub-kernel on the kernel bank, shrunk toward
+                #                   uniform
+                # ------------------------------------------------------------------
+                if self.valid_perts is not None:
+                    kernel_sub = [k[self.valid_perts, :][:, self.valid_perts].reshape(
+                        len(self.valid_perts), len(self.valid_perts)) for k in kernel_all]
+                else:
+                    kernel_sub = [k[-len(self.features['train']):, -len(self.features['train']):]
+                                  for k in kernel_all]
+                alignments = np.array([kernel_alignment(K, self.train_gold) for K in kernel_sub])
+                n_k = len(kernel_all)
+                unif = np.ones(n_k) / n_k
+                if self.integrate_mode == 'best_align':
+                    weights = np.zeros(n_k)
+                    weights[int(np.argmax(alignments))] = 1.0
+                elif self.integrate_mode == 'softmax_align':
+                    a = alignments / 0.1
+                    a = a - a.max()
+                    w = np.exp(a)
+                    weights = w / w.sum()
+                else:
+                    A = np.stack([K.ravel() for K in kernel_sub], axis=1)
+                    y = np.asarray(self.train_gold).ravel()
+                    lam = 1e-3 * np.trace(A.T @ A) / A.shape[1]
+                    w = np.linalg.solve(A.T @ A + lam * np.eye(n_k), A.T @ y)
+                    w = np.clip(w, 0, None)
+                    weights = w / w.sum() if w.sum() > 0 else unif
+                print(f'{self.integrate_mode} weights: {np.round(weights, 4)}')
+                k_agg = np.zeros_like(kernel_all[0])
+                for K, w in zip(kernel_all, weights):
+                    k_agg += w * K
             elif self.integrate_mode == 'product':
                 k_agg = np.ones_like(kernel_all[0])
                 for K in kernel_all:

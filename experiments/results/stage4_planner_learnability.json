@@ -1,0 +1,21 @@
+{
+  "n_subsets": 40,
+  "n_priors": 8,
+  "corr_align": 0.8734891417627675,
+  "corr_rank": 0.9192435792107716,
+  "argmax_agreement": 0.975,
+  "heldout_align_obs_best": 0.5564536460711589,
+  "heldout_align_best_fixed": 0.5606073158968031,
+  "heldout_align_oracle": 0.5606073158968035,
+  "probe_r2": 0.8454387123050007,
+  "prior_names": [
+    "pops_kernel",
+    "rpe1_kernel",
+    "esm_kernel",
+    "biogpt_kernel",
+    "node2vec_kernel",
+    "ops_A549_kernel",
+    "ops_HeLa_HPLM_kernel",
+    "ops_HeLa_DMEM_kernel"
+  ]
+}

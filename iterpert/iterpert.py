@@ -77,7 +77,8 @@ class IterPert:
         
         self.net = Net(params, self.device, self.dataset.pert_data, fix_evaluation)                   # load network
 
-    def initialize_active_learning_strategy(self, strategy):
+    def initialize_active_learning_strategy(self, strategy, integrate_mode = 'mean_new',
+                                           fix_typiclust_branch = False):
         available = ['Random', 'BALD', 'BatchBALD', 'BAIT', 'ACS-FW', 'Core-Set', 'BADGE', 'LCMD', 'IterPert', 'TypiClust', 'KMeansSampling']
         if strategy not in available:
             raise ValueError('Strategy not in the current available set: ' + ' '.join(available))
@@ -119,7 +120,14 @@ class IterPert:
             kernel_transforms=[] 
             sel_with_train = True
 
-        if strategy not in ['IterPert']:
+        if fix_typiclust_branch and strategy in ['TypiClust', 'KMeansSampling']:
+            # Opt-in fix for the branch-order bug below: the original code checks
+            # `strategy not in ['IterPert']` FIRST, so TypiClust/KMeansSampling can
+            # never reach their intended base kernel. Default False preserves the
+            # upstream behaviour exactly.
+            base_kernel = 'linear_fix_ctrl'
+            add_ctrl = True
+        elif strategy not in ['IterPert']:
             base_kernel = 'cross_gene_out'
             add_ctrl = False 
         elif strategy in ['TypiClust', 'KMeansSampling']:
@@ -162,7 +170,7 @@ class IterPert:
                                                                     sel_with_train, 
                                                                     reduce_latent_feat_dim_via_pca = False, 
                                                                     use_prior_only = False, 
-                                                                    integrate_mode = 'mean_new', 
+                                                                    integrate_mode = integrate_mode, 
                                                                     normalize_mode = 'max', 
                                                                     prior_kernel_list = prior_kernel_list, 
                                                                     prior_kernel_pert_list = pert_list, 
@@ -192,10 +200,13 @@ class IterPert:
 
         self.strategy = strategy
 
-    def start(self, n_init_labeled = 100, n_round = 5, n_query = 100, save_kernel = False, save_path = None):
+    def start(self, n_init_labeled = 100, n_round = 5, n_query = 100, save_kernel = False, save_path = None,
+              save_metrics = True):
         if save_path is None:
             save_path = self.path
         round2query = {}
+        # full per-round learning curve (not just the queried perturbations)
+        curve = []
 
         # start experiment
         init_idx = self.dataset.initialize_labels(n_init_labeled)
@@ -203,7 +214,9 @@ class IterPert:
         print(f"number of labeled pool: {n_init_labeled}")
         print(f"number of unlabeled pool: {self.dataset.n_pool-n_init_labeled}")
         print(f"number of testing pool: {self.dataset.n_test}")
-        print()
+        print("")
+
+        curve.append(self._round_metrics(0, out=None))
 
         # round 0 accuracy
         print("----- Round 0/", n_round, " ----")
@@ -223,6 +236,7 @@ class IterPert:
                 self.wandb.log({'test_round_' + m: np.mean([j[m] for i,j in out.items() if m in j])})
 
         print(f"Round 0 pearson delta: {np.mean([j['pearson_delta'] for i,j in out.items() if 'pearson_delta' in j])}")
+        curve.append(self._round_metrics(0, out))
 
 
         for rd in range(1, n_round+1):
@@ -245,6 +259,7 @@ class IterPert:
                     self.wandb.log({'test_round_' + m: np.mean([j[m] for i,j in out.items() if m in j])})
 
             print(f"Round {rd} pearson delta: {np.mean([j['pearson_delta'] for i,j in out.items() if 'pearson_delta' in j])}")
+            curve.append(self._round_metrics(rd, out))
 
 
         import pickle
@@ -252,3 +267,24 @@ class IterPert:
             os.mkdir(save_path + '/res')
         with open(save_path + '/res/' + self.exp_name + '.pkl', 'wb') as f:
             pickle.dump(round2query, f)
+        if save_metrics:
+            with open(save_path + '/res/' + self.exp_name + '_metrics.json', 'w') as f:
+                import json
+                json.dump({'exp_name': self.exp_name, 'seed': self.seed, 'run': self.run,
+                           'n_init_labeled': n_init_labeled, 'n_round': n_round,
+                           'n_query': n_query, 'curve': curve}, f, indent=2)
+            print('wrote ' + save_path + '/res/' + self.exp_name + '_metrics.json')
+
+    def _round_metrics(self, rd, out):
+        """Summarise the per-perturbation evaluation dict for one round."""
+        import numpy as np
+        if out is None:
+            return {'round': rd}
+        agg = lambda key: float(np.mean([j[key] for j in out.values() if key in j])) \
+            if any(key in j for j in out.values()) else None
+        row = {'round': rd, 'n_test_perts': len(out)}
+        for m in ['pearson_delta', 'mse_non_dropout', 'mse_top20_de_non_dropout',
+                  'pearson_delta_top20_de_non_dropout',
+                  'frac_opposite_direction_top20_non_dropout']:
+            row[m] = agg(m)
+        return row

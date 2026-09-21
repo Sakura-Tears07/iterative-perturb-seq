@@ -80,7 +80,8 @@ parser.add_argument('--save_kernel', action = 'store_true', default=False)
 
 parser.add_argument('--use_prior', action = 'store_true', default=False)
 parser.add_argument('--use_prior_only', action = 'store_true', default=False)
-parser.add_argument('--integrate_mode',  type=str, choices=['mean', 'coeff', 'learn', 'mean_new', 'product', 'max', 'alignment'], default='mean')
+parser.add_argument('--integrate_mode',  type=str, choices=['mean', 'coeff', 'learn', 'mean_new', 'product', 'max', 'alignment',
+                          'softmax_align', 'best_align', 'ridge_lab'], default='mean')
 parser.add_argument('--normalize_mode',  type=str, choices=['diagonal', 'mean', 'max', 'trace', 'frobenius', 'row_sum', 'centering', 'ID', 'diag'], default='diag')
 parser.add_argument('--use_single_prior', action = 'store_true', default=False)
 parser.add_argument('--single_prior', type=str, choices=['kg_kernel', 'pops_kernel', 'rpe1_kernel', 
