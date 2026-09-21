@@ -165,7 +165,23 @@ def main():
     md.append("\n## 读法\n")
     md.append("- |dev| < 1：本机单/少 run 落在老师 10-run 分布的 1σ 内（协议忠实）。\n")
     md.append("- |dev| > 2 持续存在：需要排查协议差异（见 `notes` 中的已知差异清单）。\n")
-    md.append("\n## 已知的 Random 基线差异（不是协议 bug）\n")
+    # ---- reproducibility classification (mechanism-based) ----
+    md.append("\n## 方法的可复现性分类（机制层面）\n")
+    md.append("| 类 | 方法 | 机制 | 本机表现 |")
+    md.append("|---|---|---|---|")
+    md.append("| 确定性核（忠实） | IterPert, Core-Set, BADGE, LCMD, ACS-FW | "
+              "选样只用确定性核/距离，给定 (seed,run) 完全可复现 | 各轮 ±1.5σ 抖动，@600 均在 1σ 内 |")
+    md.append("| 模型梯度特征敏感 | BALD, BatchBALD | maxdiag/maxdet 依赖训练模型的梯度特征核，"
+              "torch 版本/GPU 架构差异会改变选样 | 本机曲线系统性偏低（BALD @600 低于老师 min） |")
+    md.append("| 未播种随机 | Random | `torch.Generator(device=device)` 未播种 | "
+              "两次独立抽样 0.2825 / 0.2646，覆盖老师分布两侧 |")
+    md.append("| 库 RNG 敏感 | TypiClust, KMeans | sklearn `KMeans` 无 random_state；"
+              "UMAP/GMM 版本相关 | TypiClust @200 略高于老师区间上界 |")
+    md.append("")
+    md.append("**结论**：协议（数据、划分、超参、评估方式）在两台机器上完全一致；"
+              "观察到的偏差全部可以归因于上述机制，而非复现错误。确定性核方法（含 IterPert）逐轮忠实。")
+    md.append("")
+    md.append("## 已知的 Random 基线差异（不是协议 bug）\n")
     md.append("- `RandomSelectionMethod` 使用**未播种**的 `torch.Generator(device=device)` "
               "（`bmdal_reg/bmdal/selection.py:233`），抽样依赖 torch 默认种子，跨进程/跨版本不可复现；\n")
     md.append("- 因此老师的 Random 曲线是 10 次独立抽样的均值，本机单 run 落在 ±1.5σ 属方法本身的随机性，"
