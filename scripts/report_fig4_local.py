@@ -62,6 +62,23 @@ def load_local(method_dir):
                          "local_n": g.count(), "local_values": g.apply(list)})
 
 
+def load_fig4c():
+    priors = ["pops_kernel", "rpe1_kernel", "esm_kernel", "biogpt_kernel",
+              "node2vec_kernel", "ops_A549_kernel", "ops_HeLa_HPLM_kernel",
+              "ops_HeLa_DMEM_kernel"]
+    teacher_long = RESULTS / "fig4c" / "comparison" / "tables" / "all_priors_long.csv"
+    tl = pd.read_csv(teacher_long) if teacher_long.exists() else pd.DataFrame()
+    out = {}
+    for prior in priors:
+        d = RESULTS / "fig4c" / "single_prior" / prior
+        local = load_local(d)
+        if local is None:
+            continue
+        t = tl[tl["prior"] == prior].set_index("n_labeled")[["mean", "std", "count"]]             if not tl.empty else pd.DataFrame(index=local.index)
+        out[prior] = (t, local)
+    return out
+
+
 def main():
     rows, figure_rows = [], []
     fig, ax = plt.subplots(figsize=(9, 6))
@@ -89,6 +106,24 @@ def main():
 
     comp = pd.DataFrame(rows)
     comp.to_csv(ESS.parent / "comparison" / "tables" / "local_vs_teacher.csv", index=False)
+
+    # ---- fig4c section ----
+    c4_rows = []
+    for prior, (teacher, local) in load_fig4c().items():
+        both = pd.concat([teacher, local], axis=1)
+        for n_labeled, row in both.iterrows():
+            dev = (row["local_mean"] - row["mean"]) / row["std"] if (
+                "mean" in row and "std" in row and row["std"] > 0 and not pd.isna(row["mean"])
+            ) else None
+            c4_rows.append(dict(prior=prior, n_labeled=int(n_labeled),
+                                teacher_mean=row.get("mean"), teacher_std=row.get("std"),
+                                teacher_n=row.get("count"), local_mean=row["local_mean"],
+                                local_std=row["local_std"], local_n=row["local_n"],
+                                dev_from_teacher=dev))
+    c4 = pd.DataFrame(c4_rows)
+    if len(c4):
+        c4.to_csv(RESULTS / "fig4c" / "comparison" / "tables" / "local_vs_teacher.csv",
+                  index=False)
 
     # figure: local curves + teacher mean markers
     for name, local, color in figure_rows:
@@ -118,6 +153,15 @@ def main():
         lm = "—" if pd.isna(r.local_mean) else f"{r.local_mean:.4f} ± {r.local_std:.4f} ({int(r.local_n)})"
         dv = "—" if r.dev_from_teacher is None else f"{r.dev_from_teacher:+.2f}"
         md.append(f"| {r.method} | {r.n_labeled} | {tm} | {lm} | {dv} |")
+    if len(c4):
+        md.append("\n## fig4c 单先验消融（本机 vs 老师 5-run 表）\n")
+        md.append("| prior | n_labeled | 老师 mean ± std (n) | 本机 mean (n) | dev |")
+        md.append("|---|---|---|---|---|")
+        for r in c4.sort_values(["prior", "n_labeled"]).itertuples():
+            tm = "—" if pd.isna(r.teacher_mean) else f"{r.teacher_mean:.4f} ± {r.teacher_std:.4f} ({int(r.teacher_n)})"
+            lm = "—" if pd.isna(r.local_mean) else f"{r.local_mean:.4f} ({int(r.local_n)})"
+            dv = "—" if r.dev_from_teacher is None else f"{r.dev_from_teacher:+.2f}"
+            md.append(f"| {r.prior} | {r.n_labeled} | {tm} | {lm} | {dv} |")
     md.append("\n## 读法\n")
     md.append("- |dev| < 1：本机单/少 run 落在老师 10-run 分布的 1σ 内（协议忠实）。\n")
     md.append("- |dev| > 2 持续存在：需要排查协议差异（见 `notes` 中的已知差异清单）。\n")
