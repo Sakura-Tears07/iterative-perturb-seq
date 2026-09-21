@@ -121,6 +121,11 @@ def main():
     md.append("\n## 读法\n")
     md.append("- |dev| < 1：本机单/少 run 落在老师 10-run 分布的 1σ 内（协议忠实）。\n")
     md.append("- |dev| > 2 持续存在：需要排查协议差异（见 `notes` 中的已知差异清单）。\n")
+    md.append("\n## 已知的 Random 基线差异（不是协议 bug）\n")
+    md.append("- `RandomSelectionMethod` 使用**未播种**的 `torch.Generator(device=device)` "
+              "（`bmdal_reg/bmdal/selection.py:233`），抽样依赖 torch 默认种子，跨进程/跨版本不可复现；\n")
+    md.append("- 因此老师的 Random 曲线是 10 次独立抽样的均值，本机单 run 落在 ±1.5σ 属方法本身的随机性，"
+              "不构成协议偏离；IterPert 及所有基于核的方法给定 (seed, run) 是确定性的。\n")
     (RESULTS / "LOCAL_VERIFICATION.md").write_text("\n".join(md))
     print("wrote", RESULTS / "LOCAL_VERIFICATION.md")
     print(comp.groupby("method")["dev_from_teacher"].agg(["mean", "max"]).round(2))
