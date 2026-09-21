@@ -227,5 +227,5 @@ class TypiClust(Strategy):
         assert len(selected) == n, 'added a different number of samples'
         assert len(np.intersect1d(selected, labeled_list)) == 0, 'should be new samples'
         p_list = pert_list[selected]
-        unc_index = np.where(np.in1d(self.dataset.pert_train, p_list))[0]
+        unc_index = np.where(np.isin(self.dataset.pert_train, p_list))[0]
         return unc_index

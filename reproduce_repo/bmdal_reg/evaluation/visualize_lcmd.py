@@ -41,7 +41,7 @@ def plot_step(x_train, x_pool, filename: str):
     cluster_sizes = np.bincount(cluster_idxs, weights=min_sq_dists, minlength=x_train.shape[0])
     max_cluster_size = np.max(cluster_sizes)
     is_in_largest_cluster = cluster_sizes[cluster_idxs] == max_cluster_size
-    min_sq_dists[~is_in_largest_cluster] = -np.Inf
+    min_sq_dists[~is_in_largest_cluster] = -np.inf
     best_idx = np.argmax(min_sq_dists)
     for i in range(x_pool.shape[0]):
         color = '#FF8800' if is_in_largest_cluster[i] else '#4444FF'

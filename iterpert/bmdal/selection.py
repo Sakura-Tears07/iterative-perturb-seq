@@ -95,7 +95,7 @@ class IterativeSelectionMethod(SelectionMethod):
         and that the batch should be filled up with random samples.
         """
         scores = self.get_scores().clone()
-        scores[self.selected_idxs] = -np.Inf
+        scores[self.selected_idxs] = -np.inf
         return torch.argmax(self.get_scores()).item()
 
     def select(self, batch_size: int) -> torch.Tensor:
@@ -276,7 +276,7 @@ class MaxDetSelectionMethod(IterativeSelectionMethod):
     def get_next_idx(self) -> Optional[int]:
         # print('max score:', torch.max(self.get_scores()).item())
         scores = self.get_scores().clone()
-        scores[self.selected_idxs] = -np.Inf
+        scores[self.selected_idxs] = -np.inf
         new_idx = torch.argmax(scores).item()
         if scores[new_idx] <= 0.0:
             print(f'Selecting index {len(self.selected_idxs)+1}: new diag entry nonpositive')
@@ -304,7 +304,7 @@ class MaxDetSelectionMethod(IterativeSelectionMethod):
         # if str(self.pool_features.get_device()) != 'cpu':
         #     torch.cuda.empty_cache()
 
-        self.diag[new_idx] = -np.Inf   # ensure that the index is not selected again
+        self.diag[new_idx] = -np.inf   # ensure that the index is not selected again
 
 
 
@@ -345,7 +345,7 @@ class MaxDetSelectionWithPrior(IterativeSelectionMethod):
     def get_next_idx(self) -> Optional[int]:
         # print('max score:', torch.max(self.get_scores()).item())
         scores = self.get_scores().clone()
-        scores[self.selected_idxs] = -np.Inf
+        scores[self.selected_idxs] = -np.inf
         new_idx = torch.argmax(scores).item()
         if scores[new_idx] <= 0.0:
             print(f'Selecting index {len(self.selected_idxs)+1}: new diag entry nonpositive')
@@ -376,7 +376,7 @@ class MaxDetSelectionWithPrior(IterativeSelectionMethod):
         # if str(self.pool_features.get_device()) != 'cpu':
         #     torch.cuda.empty_cache()
 
-        self.diag[new_idx] = -np.Inf   # ensure that the index is not selected again
+        self.diag[new_idx] = -np.inf   # ensure that the index is not selected again
 
 
 class MaxDetFeatureSpaceSelectionMethod(IterativeSelectionMethod):
@@ -400,7 +400,7 @@ class MaxDetFeatureSpaceSelectionMethod(IterativeSelectionMethod):
 
     def get_next_idx(self) -> Optional[int]:
         scores = self.get_scores().clone()
-        scores[self.selected_idxs] = -np.Inf
+        scores[self.selected_idxs] = -np.inf
         new_idx = torch.argmax(scores).item()
         if scores[new_idx] <= 0.0:
             if self.verbosity >= 1:
@@ -445,7 +445,7 @@ class BaitFeatureSpaceSelectionMethod(ForwardBackwardSelectionMethod):
 
     def get_next_idx(self) -> Optional[int]:
         scores = self.get_scores()
-        scores[self.selected_idxs] = -np.Inf
+        scores[self.selected_idxs] = -np.inf
         new_idx = torch.argmax(scores).item()
         if scores[new_idx].item() <= 0.0:
             if self.verbosity >= 1:
@@ -483,14 +483,14 @@ class BaitFeatureSpaceSelectionMethod(ForwardBackwardSelectionMethod):
         den = (self.diag[self.selected_idxs] - self.noise_sigma ** 2)
         num = torch.clamp(self.scores_numerator[self.selected_idxs], min=0.0)
         scores = num / den
-        scores[den >= 0.0] = -np.Inf
+        scores[den >= 0.0] = -np.inf
         return scores
 
     def get_next_idx_backward(self) -> Optional[int]:
         scores = self.get_scores_backward()
         new_idx = torch.argmax(scores).item()
         new_score = scores[new_idx].item()
-        if new_score == -np.Inf or new_score >= 0.0:
+        if new_score == -np.inf or new_score >= 0.0:
             if self.verbosity >= 1:
                 print(f'Backwards selecting index {len(self.selected_idxs)}: new score positive')
             return None
@@ -531,7 +531,7 @@ class MaxDistSelectionMethod(IterativeSelectionMethod):
                  **config):
         super().__init__(pool_features=pool_features, train_features=train_features,
                          sel_with_train=sel_with_train, **config)
-        self.min_sq_dists = np.Inf * torch.ones(self.pool_features.get_n_samples(), device=pool_features.get_device())
+        self.min_sq_dists = np.inf * torch.ones(self.pool_features.get_n_samples(), device=pool_features.get_device())
 
     def get_scores(self) -> torch.Tensor:
         return self.min_sq_dists
@@ -541,7 +541,7 @@ class MaxDistSelectionMethod(IterativeSelectionMethod):
             # no point added yet, take point with largest norm
             return torch.argmax(self.pool_features.get_kernel_matrix_diag()).item()
         scores = self.get_scores().clone()
-        scores[self.selected_idxs] = -np.Inf
+        scores[self.selected_idxs] = -np.inf
         idx = torch.argmax(scores).item()
         print('Next idx:', idx, '- Value:', scores[idx].item())
         return idx
@@ -562,7 +562,7 @@ class MaxDistSelectionMethodwithPrior(IterativeSelectionMethod):
                  **config):
         super().__init__(pool_features=pool_features, train_features=train_features,
                          sel_with_train=sel_with_train, **config)
-        self.min_sq_dists = np.Inf * torch.ones(self.pool_features.get_n_samples(), device=pool_features.get_device())
+        self.min_sq_dists = np.inf * torch.ones(self.pool_features.get_n_samples(), device=pool_features.get_device())
         self.prior = prior
         self.diag = torch.diag(self.prior, 0)
     def get_scores(self) -> torch.Tensor:
@@ -574,7 +574,7 @@ class MaxDistSelectionMethodwithPrior(IterativeSelectionMethod):
             #return torch.argmax(self.pool_features.get_kernel_matrix_diag()).item()
             return torch.argmax(torch.diag(self.prior, 0)[:len(self.pool_features)]).item()
         scores = self.get_scores().clone()
-        scores[self.selected_idxs] = -np.Inf
+        scores[self.selected_idxs] = -np.inf
         idx = torch.argmax(scores).item()
         print('Next idx:', idx, '- Value:', scores[idx].item())
         return idx
@@ -607,7 +607,7 @@ class DirichletSelectionMethod(IterativeSelectionMethod):
                  **config):
         super().__init__(pool_features=pool_features, train_features=train_features,
                          sel_with_train=sel_with_train, **config)
-        self.min_sq_dists = np.Inf * torch.ones(self.pool_features.get_n_samples(), device=pool_features.get_device())
+        self.min_sq_dists = np.inf * torch.ones(self.pool_features.get_n_samples(), device=pool_features.get_device())
         self.prior = prior
         if self.prior is not None:
             self.diag = torch.diag(self.prior, 0)
@@ -712,11 +712,11 @@ class LargestClusterMaxDistSelectionMethod(IterativeSelectionMethod):
         super().__init__(pool_features=pool_features, train_features=train_features,
                          sel_with_train=sel_with_train, **config)
         self.dist_weight_mode = dist_weight_mode
-        self.min_sq_dists = np.Inf * torch.ones(self.pool_features.get_n_samples(), dtype=pool_features.get_dtype(),
+        self.min_sq_dists = np.inf * torch.ones(self.pool_features.get_n_samples(), dtype=pool_features.get_dtype(),
                                                 device=pool_features.get_device())
         self.closest_idxs = torch.zeros(self.pool_features.get_n_samples(), device=pool_features.get_device(),
                                         dtype=torch.long)
-        self.neg_inf_tensor = torch.as_tensor([-np.Inf], dtype=pool_features.get_dtype(),
+        self.neg_inf_tensor = torch.as_tensor([-np.inf], dtype=pool_features.get_dtype(),
                                               device=pool_features.get_device())
 
     def get_scores(self) -> torch.Tensor:
@@ -738,7 +738,7 @@ class LargestClusterMaxDistSelectionMethod(IterativeSelectionMethod):
             # no point added yet, take point with largest norm
             return torch.argmax(self.pool_features.get_kernel_matrix_diag()).item()
         scores = self.get_scores().clone()
-        scores[self.selected_idxs] = -np.Inf
+        scores[self.selected_idxs] = -np.inf
         idx = torch.argmax(scores).item()
         return idx
 
@@ -773,7 +773,7 @@ class FrankWolfeSelectionMethod(IterativeSelectionMethod):
 
     def get_next_idx(self) -> Optional[int]:
         scores = self.get_scores()
-        scores[self.selected_idxs] = -np.Inf
+        scores[self.selected_idxs] = -np.inf
         return torch.argmax(scores).item()
 
     def add(self, new_idx: int):
@@ -815,7 +815,7 @@ class FrankWolfeKernelSpaceSelectionMethod(IterativeSelectionMethod):
 
     def get_next_idx(self) -> Optional[int]:
         scores = self.get_scores()
-        scores[self.selected_idxs] = -np.Inf
+        scores[self.selected_idxs] = -np.inf
         return torch.argmax(scores).item()
 
     def add(self, new_idx: int):
@@ -866,7 +866,7 @@ class RandomizedMinDistSumSelectionMethod(MaxDistSelectionMethod):
         candidates = torch.multinomial(weights, n_candidates)
         sq_dists = self.pool_features[candidates].get_sq_dists(self.pool_features)
         new_sq_dist_sums = torch.minimum(self.min_sq_dists[None, :].expand(n_candidates, -1), sq_dists).sum(dim=-1)
-        new_sq_dist_sums[self.selected_idxs] = np.Inf
+        new_sq_dist_sums[self.selected_idxs] = np.inf
         return candidates[torch.argmin(new_sq_dist_sums)].item()
 
 

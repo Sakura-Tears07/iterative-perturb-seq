@@ -17,6 +17,12 @@ from .data_utils import get_DE_genes, get_dropout_non_zero_genes, DataSplitter
 from .utils import print_sys, zip_data_download_wrapper, dataverse_download,\
                   filter_pert_in_go, get_genes_from_perts
 
+def _as_dense_row(x):
+    if hasattr(x, "toarray"):
+        x = x.toarray()
+    return np.asarray(x).reshape(-1)
+
+
 class PertData:
     
     def __init__(self, data_path, 
@@ -289,9 +295,10 @@ class PertData:
                                       test_perts=test_perts,
                                       seed=seed)
 
-            set2conditions = dict(adata.obs.groupby('split').agg({'condition':
-                                                        lambda x: x}).condition)
-            set2conditions = {i: j.unique().tolist() for i,j in set2conditions.items()} 
+            set2conditions = {
+                split_name: group['condition'].astype(str).unique().tolist()
+                for split_name, group in adata.obs.groupby('split', observed=False)
+            } 
             pickle.dump(set2conditions, open(split_path, "wb"))
             print_sys("Saving new splits at " + split_path)
             
@@ -502,7 +509,7 @@ class PertData:
             pert_idx = self.get_pert_idx(pert_category, adata_)
 
             # Store list of genes that are most differentially expressed for testing
-            pert_de_category = adata_.obs['condition_name'][0]
+            pert_de_category = adata_.obs['condition_name'].iloc[0]
             if de:
                 de_idx = np.where(adata_.var_names.isin(
                 np.array(de_genes[pert_de_category][:num_de_genes])))[0]
@@ -527,8 +534,8 @@ class PertData:
         cell_graphs = []
         if batch_info is not None:
             for X, y, b in zip(Xs, ys, batch_info):
-                cell_graphs.append(self.create_cell_graph(X.toarray(),
-                                    y.toarray(), de_idx, pert_category, 
+                cell_graphs.append(self.create_cell_graph(_as_dense_row(X),
+                                    _as_dense_row(y), de_idx, pert_category, 
                                     pert_idx, b))
         else:
             for X, y in zip(Xs, ys):

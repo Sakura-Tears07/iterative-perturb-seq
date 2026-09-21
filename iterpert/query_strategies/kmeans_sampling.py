@@ -233,7 +233,7 @@ class KMeansSampling(Strategy):
                 q_idxs = np.concatenate((q_idxs, add_set))
                 assert len(q_idxs) == n
             #q_idxs = np.array([np.arange(embeddings.shape[0])[cluster_idxs==i][dis[cluster_idxs==i].argmin()] for i in range(n)])
-            unc_index = np.where(np.in1d(self.dataset.pert_train, pert_list[q_idxs]))[0]
+            unc_index = np.where(np.isin(self.dataset.pert_train, pert_list[q_idxs]))[0]
         
         elif self.mode == 'Agglomerative':
             from sklearn.cluster import AgglomerativeClustering
@@ -245,7 +245,7 @@ class KMeansSampling(Strategy):
             dis = (embeddings - centers)**2
             dis = dis.sum(axis=1)
             q_idxs = np.array([np.arange(embeddings.shape[0])[cluster_idxs==i][dis[cluster_idxs==i].argmin()] for i in range(n)])
-            unc_index = np.where(np.in1d(self.dataset.pert_train, pert_list[q_idxs]))[0]
+            unc_index = np.where(np.isin(self.dataset.pert_train, pert_list[q_idxs]))[0]
 
         elif self.mode == 'Spectral':
             from sklearn.cluster import SpectralClustering
@@ -258,7 +258,7 @@ class KMeansSampling(Strategy):
             dis = (embeddings - centers)**2
             dis = dis.sum(axis=1)
             q_idxs = np.array([np.arange(embeddings.shape[0])[cluster_idxs==i][dis[cluster_idxs==i].argmin()] for i in range(n)])
-            unc_index = np.where(np.in1d(self.dataset.pert_train, pert_list[q_idxs]))[0]
+            unc_index = np.where(np.isin(self.dataset.pert_train, pert_list[q_idxs]))[0]
 
 
         elif self.mode == 'gmm_max':
@@ -274,7 +274,7 @@ class KMeansSampling(Strategy):
                 q_idxs.append(filter_[0][idx])
 
             q_idxs = np.array(q_idxs)
-            unc_index = np.where(np.in1d(self.dataset.pert_train, pert_list[q_idxs]))[0]
+            unc_index = np.where(np.isin(self.dataset.pert_train, pert_list[q_idxs]))[0]
 
         elif self.mode == 'gmm_min':
             from sklearn.mixture import GaussianMixture
@@ -289,7 +289,7 @@ class KMeansSampling(Strategy):
                 q_idxs.append(filter_[0][idx])
 
             q_idxs = np.array(q_idxs)
-            unc_index = np.where(np.in1d(self.dataset.pert_train, pert_list[q_idxs]))[0]
+            unc_index = np.where(np.isin(self.dataset.pert_train, pert_list[q_idxs]))[0]
 
         elif self.mode == 'kmeans++':
             from sklearn.cluster import kmeans_plusplus
@@ -299,5 +299,5 @@ class KMeansSampling(Strategy):
                                             n_local_trials = 1)
             p_list = pert_list[indices]
             
-            unc_index = np.where(np.in1d(self.dataset.pert_train, np.array(p_list)))[0]
+            unc_index = np.where(np.isin(self.dataset.pert_train, np.array(p_list)))[0]
         return unc_index

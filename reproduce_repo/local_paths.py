@@ -1,14 +1,38 @@
-"""Local path configuration for ITERpert reproduction."""
+"""Local path configuration for ITERPert reproduction.
+
+Environment variables (all optional; defaults target the local machine):
+
+    ITERPERT_DATA_ROOT          base data dir
+    ITERPERT_GEARS_DATA_PATH    GEARS processed data (defaults to <root>/perturb_seq_data/gears_data)
+    ITERPERT_ESS1K_KERNEL_DIR   essential-1k knowledge kernels (defaults to <gears>/replogle_k562_essential_1000hvg_kernels/knowledge_kernels_1k)
+    ITERPERT_GW_KERNEL_DIR      genome-wide knowledge kernels (fig6; not available locally)
+    ITERPERT_CHECKPOINT_DIR     model checkpoint dir
+"""
 import os
 from pathlib import Path
 
-DATA_ROOT = os.environ.get("ITERPERT_DATA_ROOT", "/data/zy/iterpert")
+DATA_ROOT = os.environ.get("ITERPERT_DATA_ROOT", "/data/lhr/ai4s/iterpert/scratch")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-GEARS_DATA_PATH = os.path.join(DATA_ROOT, "datasets", "gears_data") + os.sep
-SAVE_DIR = os.path.join(DATA_ROOT, "checkpoints")
+GEARS_DATA_PATH = os.environ.get(
+    "ITERPERT_GEARS_DATA_PATH",
+    os.path.join(DATA_ROOT, "perturb_seq_data", "gears_data"),
+) + os.sep
+SAVE_DIR = os.environ.get(
+    "ITERPERT_CHECKPOINT_DIR", os.path.join(DATA_ROOT, "checkpoints"))
 RES_DIR = str(REPO_ROOT / "results")
-GRADIENT_KERNEL_DIR = os.path.join(DATA_ROOT, "cache", "gradient_kernel")
+GRADIENT_KERNEL_DIR = os.path.join(DATA_ROOT, "knowledge_kernels", "gradient_kernel")
+
+ESS1K_KERNEL_DIR = os.environ.get(
+    "ITERPERT_ESS1K_KERNEL_DIR",
+    os.path.join(GEARS_DATA_PATH,
+                 "replogle_k562_essential_1000hvg_kernels", "knowledge_kernels_1k"),
+) + os.sep
+
+GW_KERNEL_DIR = os.environ.get(
+    "ITERPERT_GW_KERNEL_DIR",
+    os.path.join(DATA_ROOT, "knowledge_kernels_gw"),
+) + os.sep
 
 
 def resolve_result_dir(args) -> str:
@@ -45,15 +69,12 @@ def resolve_result_dir(args) -> str:
 
     return str(root / "misc")
 
+
 KERNEL_PATHS = {
-    "replogle_k562_essential_1000hvg": os.path.join(
-        DATA_ROOT, "knowledge_kernels", "essential_1k") + os.sep,
-    "replogle_k562_essential_1000hvg+pert_in_gene": os.path.join(
-        DATA_ROOT, "knowledge_kernels", "essential_1k") + os.sep,
-    "replogle_k562_gw_1000hvg": os.path.join(
-        DATA_ROOT, "knowledge_kernels", "genome_wide") + os.sep,
-    "replogle_rpe1_essential_1000hvg": os.path.join(
-        DATA_ROOT, "knowledge_kernels", "essential_1k") + os.sep,
+    "replogle_k562_essential_1000hvg": ESS1K_KERNEL_DIR,
+    "replogle_k562_essential_1000hvg+pert_in_gene": ESS1K_KERNEL_DIR,
+    "replogle_k562_gw_1000hvg": GW_KERNEL_DIR,
+    "replogle_rpe1_essential_1000hvg": ESS1K_KERNEL_DIR,
 }
 
 CUSTOM_TEST_SPLIT = os.path.join(
@@ -64,6 +85,6 @@ CUSTOM_TEST_SPLIT = os.path.join(
 )
 
 ESSENTIAL_GENE_PATHS = {
-    "gw": os.path.join(DATA_ROOT, "knowledge_kernels", "genome_wide"),
-    "default": os.path.join(DATA_ROOT, "knowledge_kernels", "essential_1k"),
+    "gw": GW_KERNEL_DIR,
+    "default": ESS1K_KERNEL_DIR,
 }

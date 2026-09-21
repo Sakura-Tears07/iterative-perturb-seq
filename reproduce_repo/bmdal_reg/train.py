@@ -159,7 +159,7 @@ def fit_model(model, data, n_models, train_idxs, valid_idxs, n_epochs=256, batch
     else:
         valid_dl = None
     n_steps = n_epochs * len(train_dl)
-    best_valid_rmses = [np.Inf] * n_models
+    best_valid_rmses = [np.inf] * n_models
     best_model_params = [p.detach().clone() for p in model.parameters()]
     if config.get('opt_name', 'adam') == 'sgd':
         opt = torch.optim.SGD(model.parameters(), lr=lr)

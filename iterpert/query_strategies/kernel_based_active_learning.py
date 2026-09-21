@@ -157,5 +157,5 @@ class kernel_based_active_learning(Strategy):
                             base_kernel=base_kernel, kernel_transforms=self.kernel_transforms, 
                             lamb = self.lamb, round = round)
         p_list = pert_list[np.where(np.isin(pert_list, strategy.dataset.pert_train[~labeled_idxs]))[0]][new_idxs.detach().cpu().numpy()]
-        unc_index = np.where(np.in1d(self.dataset.pert_train, np.array(p_list)))[0]
+        unc_index = np.where(np.isin(self.dataset.pert_train, np.array(p_list)))[0]
         return unc_index

@@ -239,8 +239,12 @@ def get_similarity_network(network_type, adata, threshold, k,
         else:
             df_jaccard = make_GO(data_path, pert_list, data_name)
 
-        df_out = df_jaccard.groupby('target').apply(lambda x: x.nlargest(k + 1,
-                                    ['importance'])).reset_index(drop = True)
+        df_out = (
+            df_jaccard.sort_values(['target', 'importance'], ascending=[True, False])
+            .groupby('target', sort=False)
+            .head(k + 1)
+            .reset_index(drop=True)
+        )
 
     return df_out
 
