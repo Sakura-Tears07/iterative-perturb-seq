@@ -82,6 +82,16 @@ def make_runs(only):
             runs.append((f"{slug}_r1", 1,
                          base_args(strat, base_kernel="linear_fix_ctrl"),
                          RESULTS / "fig4" / "essential_1k" / "baselines" / slug / "runs"))
+    if only in ("ablation", "all"):
+        # fig4a/b ablation: IterPert without the model kernel (prior-only fusion).
+        # Same naming as the authors' `prior_onlymean_new_max` runs (notebook cell 6).
+        for run in [1, 2, 3]:
+            a = base_args("kernel_based_active_learning",
+                          kernel_strategy="Core-Set",
+                          base_kernel="diff_effect", use_prior=True)
+            a += ["--use_prior_only"]
+            runs.append((f"iterpert_prior_only_r{run}", run, a,
+                         RESULTS / "fig4" / "essential_1k" / "iterpert" / "runs"))
     if only in ("fig4c", "all"):
         for prior in ["pops_kernel", "rpe1_kernel", "esm_kernel", "biogpt_kernel",
                       "node2vec_kernel", "ops_A549_kernel", "ops_HeLa_HPLM_kernel",
@@ -101,7 +111,7 @@ def is_done(run_no, out_dir):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--only", choices=["main", "fig4c", "all"], default="all")
+    ap.add_argument("--only", choices=["main", "fig4c", "ablation", "all"], default="all")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
