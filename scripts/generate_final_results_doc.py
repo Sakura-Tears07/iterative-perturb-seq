@@ -84,10 +84,10 @@ def main():
         for n in alln:
             if n in both.index:
                 r = both.loc[n]
-                if pd.isna(r.get("teacher_mean", float("nan"))):
+                if pd.isna(r.get("mean", float("nan"))) or r.get("std", 0) == 0:
                     cells.append(f"{r['local_mean']:.4f}")
                 else:
-                    dev = (r["local_mean"] - r["teacher_mean"]) / r["teacher_std"]
+                    dev = (r["local_mean"] - r["mean"]) / r["std"]
                     cells.append(f"{r['local_mean']:.4f} ({dev:+.1f}σ)")
             else:
                 cells.append("—")
@@ -99,11 +99,11 @@ def main():
     for name, both in rows:
         if 600 in both.index:
             r = both.loc[600]
-            tm = r.get("teacher_mean")
-            if pd.isna(tm):
+            tm, ts = r.get("mean"), r.get("std")
+            if pd.isna(tm) or ts == 0:
                 continue
-            dev = (r["local_mean"] - tm) / r["teacher_std"]
-            rank_rows.append((name, tm, r["teacher_std"], r["local_mean"],
+            dev = (r["local_mean"] - tm) / ts
+            rank_rows.append((name, tm, ts, r["local_mean"],
                               r["local_std"], int(r["local_n"]), dev))
     for name, tm, ts, lm, ls, ln, dev in sorted(rank_rows, key=lambda x: -x[1]):
         lines.append(f"| {name} | {tm:.4f} ± {ts:.4f} | {lm:.4f} ± {ls:.4f} ({ln}) | {dev:+.1f}σ |")
