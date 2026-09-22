@@ -26,16 +26,17 @@ RESULTS = REPO / "results"
 ESS = RESULTS / "fig4" / "essential_1k"
 
 METHOD_DIRS = {
-    "IterPert": ESS / "iterpert",
-    "Random": ESS / "baselines" / "random",
-    "Core-Set": ESS / "baselines" / "core_set",
-    "BALD": ESS / "baselines" / "bald",
-    "BatchBALD": ESS / "baselines" / "batchbald",
-    "BADGE": ESS / "baselines" / "badge",
-    "ACS-FW": ESS / "baselines" / "acs_fw",
-    "LCMD": ESS / "baselines" / "lcmd",
-    "TypiClust": ESS / "baselines" / "typiclust",
-    "KMeans": ESS / "baselines" / "kmeans",
+    # token disambiguates same-directory families (IterPert vs prior-only ablation)
+    "IterPert": (ESS / "iterpert", "priormean_new_max"),
+    "Random": (ESS / "baselines" / "random", None),
+    "Core-Set": (ESS / "baselines" / "core_set", None),
+    "BALD": (ESS / "baselines" / "bald", None),
+    "BatchBALD": (ESS / "baselines" / "batchbald", None),
+    "BADGE": (ESS / "baselines" / "badge", None),
+    "ACS-FW": (ESS / "baselines" / "acs_fw", None),
+    "LCMD": (ESS / "baselines" / "lcmd", None),
+    "TypiClust": (ESS / "baselines" / "typiclust", None),
+    "KMeans": (ESS / "baselines" / "kmeans", None),
 }
 METRIC = "pearson_delta"
 COLORS = {"IterPert": "#d62728", "Random": "#7f7f7f", "Core-Set": "#bcbd22",
@@ -52,8 +53,9 @@ def load_teacher(method_dir):
     return df.set_index("n_labeled")[["mean", "std", "count"]]
 
 
-def load_local(method_dir):
-    files = glob.glob(str(method_dir / "runs" / "*_metrics.csv"))
+def load_local(method_dir, token=None):
+    files = [f for f in glob.glob(str(method_dir / "runs" / "*_metrics.csv"))
+             if token is None or token in f]
     if not files:
         return None
     df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
@@ -82,8 +84,8 @@ def load_fig4c():
 def main():
     rows, figure_rows = [], []
     fig, ax = plt.subplots(figsize=(9, 6))
-    for name, d in METHOD_DIRS.items():
-        teacher, local = load_teacher(d), load_local(d)
+    for name, (d, token) in METHOD_DIRS.items():
+        teacher, local = load_teacher(d), load_local(d, token)
         if local is None:
             print(f"[skip] {name}: no local runs yet")
             continue
@@ -129,7 +131,7 @@ def main():
     for name, local, color in figure_rows:
         ax.errorbar(local.index, local["local_mean"], yerr=local["local_std"],
                     marker="o", capsize=3, color=color, label=f"{name} (local, n={int(local['local_n'].max())})")
-        d = METHOD_DIRS[name]
+        d = METHOD_DIRS[name][0]
         t = load_teacher(d)
         if t is not None:
             ax.plot(t.index, t["mean"], linestyle="--", marker="x", color=color,
