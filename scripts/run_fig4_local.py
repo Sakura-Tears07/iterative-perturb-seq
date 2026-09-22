@@ -67,7 +67,8 @@ def make_runs(only):
                          base_args("kernel_based_active_learning",
                                    kernel_strategy="Core-Set",
                                    base_kernel="diff_effect", use_prior=True),
-                         RESULTS / "fig4" / "essential_1k" / "iterpert" / "runs"))
+                         RESULTS / "fig4" / "essential_1k" / "iterpert" / "runs",
+                         "priormean_new_max"))
         for slug, k in [("random", "Random"), ("bald", "BALD"),
                         ("batchbald", "BatchBALD"), ("core_set", "Core-Set"),
                         ("badge", "BADGE"), ("acs_fw", "ACS-FW"),
@@ -77,11 +78,13 @@ def make_runs(only):
                              base_args("kernel_based_active_learning",
                                        kernel_strategy=k,
                                        base_kernel="cross_gene_out"),
-                             RESULTS / "fig4" / "essential_1k" / "baselines" / slug / "runs"))
+                             RESULTS / "fig4" / "essential_1k" / "baselines" / slug / "runs",
+                             f"_run{{run}}_{k}_cross_gene_out".format(run=run)))
         for slug, strat in [("typiclust", "TypiClust"), ("kmeans", "KMeansSampling")]:
             runs.append((f"{slug}_r1", 1,
                          base_args(strat, base_kernel="linear_fix_ctrl"),
-                         RESULTS / "fig4" / "essential_1k" / "baselines" / slug / "runs"))
+                         RESULTS / "fig4" / "essential_1k" / "baselines" / slug / "runs",
+                         f"_run1_diff_effect_{strat}"))
     if only in ("ablation", "all"):
         # fig4a/b ablation: IterPert without the model kernel (prior-only fusion).
         # Same naming as the authors' `prior_onlymean_new_max` runs (notebook cell 6).
@@ -91,7 +94,8 @@ def make_runs(only):
                           base_kernel="diff_effect", use_prior=True)
             a += ["--use_prior_only"]
             runs.append((f"iterpert_prior_only_r{run}", run, a,
-                         RESULTS / "fig4" / "essential_1k" / "iterpert" / "runs"))
+                         RESULTS / "fig4" / "essential_1k" / "iterpert" / "runs",
+                         "_prior_only"))
     if only in ("verif", "all"):
         # verification re-runs for the uncertainty-based baselines, whose
         # selection depends on the trained model's gradient features and is
@@ -102,7 +106,8 @@ def make_runs(only):
                              base_args("kernel_based_active_learning",
                                        kernel_strategy=k,
                                        base_kernel="cross_gene_out"),
-                             RESULTS / "fig4" / "essential_1k" / "baselines" / slug / "runs"))
+                             RESULTS / "fig4" / "essential_1k" / "baselines" / slug / "runs",
+                             f"_run{{run}}_{k}_cross_gene_out".format(run=run)))
     if only in ("fig4c", "all"):
         for prior in ["pops_kernel", "rpe1_kernel", "esm_kernel", "biogpt_kernel",
                       "node2vec_kernel", "ops_A549_kernel", "ops_HeLa_HPLM_kernel",
@@ -112,12 +117,17 @@ def make_runs(only):
                                    kernel_strategy="Core-Set",
                                    base_kernel="diff_effect", use_prior=True,
                                    single_prior=prior),
-                         RESULTS / "fig4c" / "single_prior" / prior / "runs"))
+                         RESULTS / "fig4c" / "single_prior" / prior / "runs",
+                         f"_single_{prior}"))
     return runs
 
 
-def is_done(run_no, out_dir):
-    return len(glob.glob(str(out_dir / f"*_run{run_no}_*_metrics.csv"))) > 0
+def is_done(run_no, out_dir, token=None):
+    if token:
+        pat = str(out_dir / f"*{token}*_run{run_no}_*_metrics.csv")
+    else:
+        pat = str(out_dir / f"*_run{run_no}_*_metrics.csv")
+    return len(glob.glob(pat)) > 0
 
 
 def main():
@@ -129,21 +139,21 @@ def main():
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     runs = make_runs(args.only)
     if args.dry_run:
-        for i, (name, run, a, out) in enumerate(runs):
-            print(f"[slot {i%N_GPUS}] {name} run={run} -> {out}")
+        for i, (name, run, a, out, tok) in enumerate(runs):
+            print(f"[slot {i%N_GPUS}] {name} run={run} token={tok} -> {out}")
         print(f"total {len(runs)} runs")
         return
 
-    # (name, run_no, args, out_dir, attempts_left)
-    queue = deque((name, run, a, out, MAX_ATTEMPTS) for name, run, a, out in runs)
+    # (name, run_no, args, out_dir, token, attempts_left)
+    queue = deque((name, run, a, out, tok, MAX_ATTEMPTS) for name, run, a, out, tok in runs)
     slots = [None] * N_GPUS          # None or (proc, name, run_no, out_dir, t0)
     logf = open(LOG_DIR / "scheduler.log", "a")
     logf.write(f"\n=== suite start {time.strftime('%F %T')} {len(queue)} queued ===\n")
 
     def kick(slot):
         if queue:
-            name, run, a, out, att = queue.popleft()
-            if is_done(run, out):
+            name, run, a, out, tok, att = queue.popleft()
+            if is_done(run, out, tok):
                 logf.write(f"[skip] {name} already on disk\n"); logf.flush()
                 kick(slot)
                 return
@@ -157,7 +167,7 @@ def main():
                 cwd=RUN_PY.parent, env=env,
                 stdout=open(LOG_DIR / f"{name}.log", "ab"),
                 stderr=subprocess.STDOUT)
-            slots[slot] = (proc, name, run, a, out, att, time.time())
+            slots[slot] = (proc, name, run, a, out, tok, att, time.time())
             logf.write(f"[launch] {name} gpu={slot} "
                        f"(remaining {len(queue)})\n"); logf.flush()
 
@@ -170,21 +180,21 @@ def main():
             if s is None:
                 kick(slot)
                 continue
-            proc, name, run, a, out, att, t0 = s
+            proc, name, run, a, out, tok, att, t0 = s
             rc = proc.poll()
             if rc is not None:
-                ok = is_done(run, out)
+                ok = is_done(run, out, tok)
                 logf.write(f"[exit] {name} rc={rc} metrics={ok} "
                            f"({(time.time()-t0)/60:.0f} min)\n"); logf.flush()
                 if not ok and att > 1:
-                    queue.appendleft((name, run, a, out, att - 1))
+                    queue.appendleft((name, run, a, out, tok, att - 1))
                     logf.write(f"[requeue] {name} attempts left {att-1}\n")
                 slots[slot] = None
             elif time.time() - t0 > WATCHDOG_S:
                 proc.kill()
                 logf.write(f"[watchdog] {name} killed at 5h\n"); logf.flush()
                 if att > 1:
-                    queue.appendleft((name, run, a, out, att - 1))
+                    queue.appendleft((name, run, a, out, tok, att - 1))
                 slots[slot] = None
         time.sleep(60)
 
