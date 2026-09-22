@@ -108,6 +108,17 @@ def make_runs(only):
                                        base_kernel="cross_gene_out"),
                              RESULTS / "fig4" / "essential_1k" / "baselines" / slug / "runs",
                              f"_run{{run}}_{k}_cross_gene_out".format(run=run)))
+    if only in ("verif2", "all"):
+        # stability re-runs for the two single-prior runs that deviated from the
+        # teacher's fig4c table in the first pass (pops +5.5σ, biogpt -2.3σ).
+        for prior in ["pops_kernel", "biogpt_kernel"]:
+            runs.append((f"single_{prior}_r2", 2,
+                         base_args("kernel_based_active_learning",
+                                   kernel_strategy="Core-Set",
+                                   base_kernel="diff_effect", use_prior=True,
+                                   single_prior=prior),
+                         RESULTS / "fig4c" / "single_prior" / prior / "runs",
+                         f"_single_{prior}"))
     if only in ("fig4c", "all"):
         for prior in ["pops_kernel", "rpe1_kernel", "esm_kernel", "biogpt_kernel",
                       "node2vec_kernel", "ops_A549_kernel", "ops_HeLa_HPLM_kernel",
@@ -132,7 +143,7 @@ def is_done(run_no, out_dir, token=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--only", choices=["main", "fig4c", "ablation", "verif", "all"], default="all")
+    ap.add_argument("--only", choices=["main", "fig4c", "ablation", "verif", "verif2", "all"], default="all")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
