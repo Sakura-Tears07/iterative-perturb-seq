@@ -1,0 +1,13 @@
+{
+  "arm": "iterpert_full",
+  "run": 3,
+  "cells_per_pert": 100,
+  "n_train_perts": 1850,
+  "n_test_perts": 192,
+  "cap_enforced_in": "train/val/selection dataloaders (verified: exactly cells_per_pert)",
+  "ctrl_removed_from_pool": 1,
+  "ctrl_in_pool_after": false,
+  "n_control_cells": 10691.0,
+  "purchased_cells_per_campaign": 40000.0,
+  "control_cells_charged": 10691.0
+}

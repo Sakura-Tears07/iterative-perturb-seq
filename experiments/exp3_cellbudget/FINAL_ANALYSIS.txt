@@ -1,0 +1,83 @@
+=== per-arm, per-round means (n runs) ===
+
+--- pearson_delta (runs per arm: {'iterpert_frozen': 3, 'iterpert_full': 3, 'random': 3, 'static_prior': 3}) ---
+arm    iterpert_frozen  iterpert_full  random  static_prior
+round                                                      
+0               0.1105         0.1108  0.1099        0.1105
+1               0.1952         0.1990  0.1965        0.1988
+2               0.2335         0.2218  0.2234        0.2347
+3               0.2622         0.2611  0.2458        0.2698
+
+--- pearson_delta_top20_de_non_dropout (runs per arm: {'iterpert_frozen': 3, 'iterpert_full': 3, 'random': 3, 'static_prior': 3}) ---
+arm    iterpert_frozen  iterpert_full  random  static_prior
+round                                                      
+0               0.1928         0.1943  0.1942        0.1932
+1               0.2697         0.2820  0.2980        0.2797
+2               0.3209         0.3055  0.3188        0.3191
+3               0.3383         0.3527  0.3474        0.3561
+
+--- mse_top20_de_non_dropout (runs per arm: {'iterpert_frozen': 3, 'iterpert_full': 3, 'random': 3, 'static_prior': 3}) ---
+arm    iterpert_frozen  iterpert_full  random  static_prior
+round                                                      
+0               0.1175         0.1176  0.1177        0.1175
+1               0.1081         0.1070  0.1017        0.1077
+2               0.0998         0.1005  0.0969        0.0961
+3               0.0953         0.0924  0.0903        0.0914
+
+--- frac_opposite_direction_top20_non_dropout (runs per arm: {'iterpert_frozen': 3, 'iterpert_full': 3, 'random': 3, 'static_prior': 3}) ---
+arm    iterpert_frozen  iterpert_full  random  static_prior
+round                                                      
+0               0.4312         0.4325  0.4336        0.4362
+1               0.3971         0.3882  0.3864        0.3936
+2               0.3838         0.3760  0.3756        0.3709
+3               0.3697         0.3604  0.3524        0.3547
+
+=== PRIMARY: final budget (round 3, 400 perts, 40k purchased cells) ===
+
+--- pearson_delta ---
+arm  iterpert_frozen  iterpert_full  random  static_prior
+run                                                      
+1             0.2410         0.2532  0.2599        0.2782
+2             0.2672         0.2726  0.2433        0.2618
+3             0.2784         0.2576  0.2341        0.2696
+   full - static_prior     mean=-0.0087  per-run=[np.float64(-0.025), np.float64(0.0108), np.float64(-0.012)]  t-CI=[-0.0292,+0.0118]
+   full - iterpert_frozen  mean=-0.0011  per-run=[np.float64(0.0121), np.float64(0.0053), np.float64(-0.0208)]  t-CI=[-0.0208,+0.0186]
+   full - random           mean=+0.0154  per-run=[np.float64(-0.0068), np.float64(0.0293), np.float64(0.0235)]  t-CI=[-0.0066,+0.0373]
+
+--- pearson_delta_top20_de_non_dropout ---
+arm  iterpert_frozen  iterpert_full  random  static_prior
+run                                                      
+1             0.3278         0.3249  0.3725        0.3601
+2             0.3232         0.3679  0.3295        0.3393
+3             0.3639         0.3654  0.3401        0.3688
+   full - static_prior     mean=-0.0034  per-run=[np.float64(-0.0353), np.float64(0.0286), np.float64(-0.0034)]  t-CI=[-0.0395,+0.0328]
+   full - iterpert_frozen  mean=+0.0144  per-run=[np.float64(-0.0029), np.float64(0.0447), np.float64(0.0014)]  t-CI=[-0.0154,+0.0442]
+   full - random           mean=+0.0054  per-run=[np.float64(-0.0476), np.float64(0.0385), np.float64(0.0252)]  t-CI=[-0.0471,+0.0578]
+
+--- mse_top20_de_non_dropout ---
+arm  iterpert_frozen  iterpert_full  random  static_prior
+run                                                      
+1             0.1007         0.1000  0.0938        0.0936
+2             0.0910         0.0861  0.0901        0.0887
+3             0.0942         0.0912  0.0871        0.0920
+   full - static_prior     mean=+0.0010  per-run=[np.float64(0.0065), np.float64(-0.0026), np.float64(-0.0008)]  t-CI=[-0.0045,+0.0065]
+   full - iterpert_frozen  mean=-0.0029  per-run=[np.float64(-0.0007), np.float64(-0.0049), np.float64(-0.003)]  t-CI=[-0.0053,-0.0004]
+   full - random           mean=+0.0021  per-run=[np.float64(0.0063), np.float64(-0.004), np.float64(0.0041)]  t-CI=[-0.0040,+0.0083]
+
+--- frac_opposite_direction_top20_non_dropout ---
+arm  iterpert_frozen  iterpert_full  random  static_prior
+run                                                      
+1             0.3687         0.3724  0.3576        0.3401
+2             0.3766         0.3620  0.3445        0.3716
+3             0.3638         0.3469  0.3552        0.3523
+   full - static_prior     mean=+0.0057  per-run=[np.float64(0.0323), np.float64(-0.0096), np.float64(-0.0055)]  t-CI=[-0.0204,+0.0319]
+   full - iterpert_frozen  mean=-0.0093  per-run=[np.float64(0.0036), np.float64(-0.0146), np.float64(-0.0169)]  t-CI=[-0.0220,+0.0035]
+   full - random           mean=+0.0080  per-run=[np.float64(0.0148), np.float64(0.0174), np.float64(-0.0083)]  t-CI=[-0.0081,+0.0240]
+
+=== secondary: budget-curve AUC over rounds 0..3 (paired) ===
+pearson_delta: full - static_prior     AACU=-0.00560 per-run=[np.float64(-0.00295), np.float64(-0.00678), np.float64(-0.00708)] t-CI=[-0.00821,-0.00300]
+pearson_delta: full - iterpert_frozen  AACU=-0.00276 per-run=[np.float64(-0.00238), np.float64(-0.00264), np.float64(-0.00327)] t-CI=[-0.00328,-0.00225]
+pearson_delta: full - random           AACU=+0.00304 per-run=[np.float64(-7e-05), np.float64(0.00072), np.float64(0.00848)] t-CI=[-0.00231,+0.00839]
+mse_top20_de_non_dropout: full - static_prior     AACU=+0.00142 per-run=[np.float64(0.00406), np.float64(7e-05), np.float64(0.00012)] t-CI=[-0.00117,+0.00401]
+mse_top20_de_non_dropout: full - iterpert_frozen  AACU=-0.00060 per-run=[np.float64(0.00249), np.float64(-0.0014), np.float64(-0.00289)] t-CI=[-0.00375,+0.00254]
+mse_top20_de_non_dropout: full - random           AACU=+0.00330 per-run=[np.float64(0.00436), np.float64(0.00076), np.float64(0.00477)] t-CI=[+0.00080,+0.00579]
