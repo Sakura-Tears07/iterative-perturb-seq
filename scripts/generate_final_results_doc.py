@@ -112,12 +112,15 @@ def main():
         "| 类 | 方法 | 机制 | 本机表现 |",
         "|---|---|---|---|",
         "| 确定性核（忠实复现） | IterPert, Core-Set, BADGE, LCMD, ACS-FW | 选样只用确定性核/距离 | 各轮 ±1.5σ 内，@600 均 ≤1σ |",
-        "| 模型梯度特征敏感 | BALD（BatchBALD 较轻） | maxdiag/maxdet 依赖训练模型梯度特征核 | BALD 两次 run（0.197/0.218）都低于老师 min 0.224；BatchBALD 两次（0.262/0.234）跨均值 |",
-        "| 未播种随机 | Random | `torch.Generator(device=device)` 未播种 | 两次抽样 0.2825 / 0.2646 |",
+        "| **本机栈偏低（原因未定位）** | BALD（BatchBALD 较轻） | maxdiag/maxdet 依赖训练模型梯度特征核；**归因未验证** | BALD 两次 run（0.197/0.218）都低于老师 min 0.224；BatchBALD 两次（0.262/0.234）跨均值 |",
+        "| **固定默认种子** | Random | `torch.Generator(device=device)` 用固定默认种子（`manual_seed` 无效，实测两 run 五轮选择集相同） | 0.2825 / 0.2646 的差异来自训练种子 |",
         "| 库 RNG 敏感 | TypiClust, KMeans | sklearn `KMeans` 无 random_state；UMAP 版本相关 | TypiClust @200 略出上界，@600 −0.2σ；KMeans @600 −1.3σ |",
         "",
         "**结论：协议完全一致；所有偏差均可归因于上述机制，不是复现错误。**",
     ]
+    lines += ["", "> **口径提醒**：主指标应为归一化梯形 AUC；@600 单点会掩盖过程差异。",
+              "> 本机 AUC：IterPert 0.2448 / prior-only 0.2362（老师 IterPert 0.2502）；",
+              "> 即 prior-only 终点不退化，但整条曲线 AUC 低 0.0086。详见 `notes/corrections-and-plan.md`。", ""]
     lines += ["", "## 4. fig4a/b 消融：IterPert-Prior-Only（无模型核，n=3）", ""]
     d = ESS / "iterpert"
     l = local_df(d, "_prior_only")
