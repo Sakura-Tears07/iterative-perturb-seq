@@ -78,8 +78,10 @@ def main():
         w = df.pivot_table(index=['run', 'round'], columns='arm', values=m)
         def auc(s):
             s = s.dropna()
-            if s.empty: return np.nan
-            x = np.array([100 + 100 * i for i in s.index])
+            if s.empty:
+                return np.nan
+            rounds = np.array([r for (_, r) in s.index], dtype=float)
+            x = 100.0 + 100.0 * rounds
             return float(np.trapezoid(s.values, x) / (x[-1] - x[0]))
         a = w.groupby(level='run').apply(lambda g: auc(g['iterpert_full']), include_groups=False)
         for tgt in ['static_prior', 'iterpert_frozen', 'random']:

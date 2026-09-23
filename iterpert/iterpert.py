@@ -199,7 +199,8 @@ class IterPert:
                                                                     reduce_latent_feat_dim_via_pca = False,
                                                                     add_ctrl = add_ctrl, 
                                                                     gene_hvg_idx = None, 
-                                                                    lamb = 2)
+                                                                    lamb = 2,
+                                                                    random_seed = random_seed)
 
         self.strategy = strategy
 
