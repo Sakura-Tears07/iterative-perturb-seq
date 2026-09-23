@@ -6,7 +6,9 @@ import os
 from .gears.utils import dataverse_download
 
 class Data:
-    def __init__(self, path, data_name, batch_size, adata = None, test_fraction = 0.1, seed = 1, custom_test = None):
+    def __init__(self, path, data_name, batch_size, adata = None, test_fraction = 0.1, seed = 1, custom_test = None,
+                 max_cells_per_pert = None):
+        self.max_cells_per_pert = max_cells_per_pert
         
         
         pert_data = PertData(path) # specific saved folder
@@ -72,10 +74,12 @@ class Data:
 
         return labeled_idxs, {'train_loader': self.pert_data.get_dataloader_from_pert_list(self.pert_train[labeled_idxs_train], 
                                                                                            self.batch_size, shuffle = True, 
-                                                                                           eval_mode = False, batch_exp = batch_exp),
+                                                                                           eval_mode = False, batch_exp = batch_exp,
+                                                                                           max_cells = self.max_cells_per_pert),
                               'val_loader': self.pert_data.get_dataloader_from_pert_list(self.pert_train[labeled_idxs_valid], 
                                                                                          self.batch_size, shuffle = False, 
-                                                                                         eval_mode = True, batch_exp = batch_exp),
+                                                                                         eval_mode = True, batch_exp = batch_exp,
+                                                                                         max_cells = self.max_cells_per_pert),
                               'valid_pert': self.pert_train[labeled_idxs_valid],
                               'train_pert': self.pert_train[labeled_idxs_train],
                               'train_valid_pert': self.pert_train[labeled_idxs]
@@ -89,7 +93,8 @@ class Data:
         return self.labeled_idxs.copy(), self.pert_data.get_dataloader_from_pert_list(self.pert_train, self.batch_size, 
                                                                                       shuffle = False, eval_mode = True, 
                                                                                       get_distinct_perts = get_distinct_perts,
-                                                                                      batch_exp = batch_exp)
+                                                                                      batch_exp = batch_exp,
+                                                                                      max_cells = self.max_cells_per_pert)
 
     def get_test_data(self, get_distinct_perts = False):
         return self.pert_data.get_dataloader_from_pert_list(self.pert_test, self.batch_size, shuffle = False, eval_mode = True, get_distinct_perts = get_distinct_perts)

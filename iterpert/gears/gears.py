@@ -222,7 +222,19 @@ class GEARS:
        
         torch.save(self.best_model.state_dict(), os.path.join(path, 'model.pt'))
     
+    def freeze_selection_model(self):
+        """Snapshot the model used ONLY for selection embeddings (frozen-kernel arm)."""
+        self.frozen_selection_state = {k: v.detach().clone()
+                                       for k, v in self.best_model.state_dict().items()}
+
     def get_latent_emb(self, data, latent_type):
+        if getattr(self, 'frozen_selection_state', None) is not None:
+            cur = {k: v.detach().clone() for k, v in self.best_model.state_dict().items()}
+            self.best_model.load_state_dict(self.frozen_selection_state)
+            try:
+                return get_latent_emb(data, self.best_model, self.device, latent_type)
+            finally:
+                self.best_model.load_state_dict(cur)
         return get_latent_emb(data, self.best_model, self.device, latent_type)        
 
     def predict_from_loader(self, dataloader, detail_eval = False):

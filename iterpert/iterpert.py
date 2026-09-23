@@ -47,8 +47,9 @@ class IterPert:
         print('device: ', device)
 
     def initialize_data(self, path, dataset_name, adata = None, batch_size = 256, 
-                        test_fraction = 0.1, custom_test = None):
-        self.dataset = Data(path, dataset_name, batch_size, adata, test_fraction, self.seed, custom_test)
+                        test_fraction = 0.1, custom_test = None, max_cells_per_pert = None):
+        self.dataset = Data(path, dataset_name, batch_size, adata, test_fraction, self.seed,
+                            custom_test, max_cells_per_pert = max_cells_per_pert)
         self.test_data = self.dataset.get_test_data()
         self.dataset_name = dataset_name
         self.path = path
@@ -78,7 +79,7 @@ class IterPert:
         self.net = Net(params, self.device, self.dataset.pert_data, fix_evaluation)                   # load network
 
     def initialize_active_learning_strategy(self, strategy, integrate_mode = 'mean_new',
-                                           fix_typiclust_branch = False):
+                                           fix_typiclust_branch = False, random_seed = None):
         available = ['Random', 'BALD', 'BatchBALD', 'BAIT', 'ACS-FW', 'Core-Set', 'BADGE', 'LCMD', 'IterPert', 'TypiClust', 'KMeansSampling']
         if strategy not in available:
             raise ValueError('Strategy not in the current available set: ' + ' '.join(available))
@@ -178,7 +179,8 @@ class IterPert:
                                                                     add_ctrl = add_ctrl, 
                                                                     prior_feat_list = prior_feat_list, 
                                                                     gene_hvg_idx = None, 
-                                                                    lamb = 2)
+                                                                    lamb = 2,
+                                                                    random_seed = random_seed)
         elif strategy in ['TypiClust', 'KMeansSampling']:
             strategy = get_strategy(strategy)(self.dataset, self.net, 
                                                     base_kernel, 
@@ -201,7 +203,7 @@ class IterPert:
         self.strategy = strategy
 
     def start(self, n_init_labeled = 100, n_round = 5, n_query = 100, save_kernel = False, save_path = None,
-              save_metrics = True):
+              save_metrics = True, freeze_selection_after_round0 = False):
         if save_path is None:
             save_path = self.path
         round2query = {}
@@ -236,6 +238,9 @@ class IterPert:
                 self.wandb.log({'test_round_' + m: np.mean([j[m] for i,j in out.items() if m in j])})
 
         print(f"Round 0 pearson delta: {np.mean([j['pearson_delta'] for i,j in out.items() if 'pearson_delta' in j])}")
+        if freeze_selection_after_round0:
+            self.strategy.net.freeze_selection_model()
+            print('[frozen-kernel arm] selection-model snapshot taken after round 0')
         curve.append(self._round_metrics(0, out))
 
 

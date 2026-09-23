@@ -38,6 +38,9 @@ class Net:
         
     def get_latent_emb(self, data, latent_type):
         return self.gears_model.get_latent_emb(data, latent_type)
+
+    def freeze_selection_model(self):
+        self.gears_model.freeze_selection_model()
         
     def predict_prob(self, data):
         ## return uncertainty

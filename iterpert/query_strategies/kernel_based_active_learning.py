@@ -18,7 +18,8 @@ class kernel_based_active_learning(Strategy):
                  use_prior_only = False, integrate_mode = 'mean', normalize_mode = 'diag', 
                  prior_kernel_list = None, prior_kernel_pert_list = None, train_gold = None, 
                 add_ctrl = False, 
-                 prior_feat_list = None, gene_hvg_idx = None, lamb = None):
+                 prior_feat_list = None, gene_hvg_idx = None, lamb = None,
+                 random_seed = None):
         super(kernel_based_active_learning, self).__init__(dataset, net)
         self.selection_method = selection_method
         self.base_kernel = base_kernel
@@ -36,6 +37,7 @@ class kernel_based_active_learning(Strategy):
         self.prior_feat_list = prior_feat_list
         self.gene_hvg_idx = gene_hvg_idx
         self.lamb = lamb
+        self.random_seed = random_seed
     def query(self, n, save_kernel = False, save_name = None, valid_perts = None, round = None):
         strategy = self
         
@@ -155,7 +157,7 @@ class kernel_based_active_learning(Strategy):
                             data={'train': train_data, 'pool': pool_data}, y_train=0,
                             selection_method=self.selection_method, sel_with_train=self.sel_with_train,
                             base_kernel=base_kernel, kernel_transforms=self.kernel_transforms, 
-                            lamb = self.lamb, round = round)
+                            lamb = self.lamb, round = round, random_seed = self.random_seed)
         p_list = pert_list[np.where(np.isin(pert_list, strategy.dataset.pert_train[~labeled_idxs]))[0]][new_idxs.detach().cpu().numpy()]
         unc_index = np.where(np.isin(self.dataset.pert_train, np.array(p_list)))[0]
         return unc_index

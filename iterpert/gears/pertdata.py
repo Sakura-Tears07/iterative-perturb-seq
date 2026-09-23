@@ -313,7 +313,8 @@ class PertData:
 
     def get_dataloader_from_pert_list(self, pert_list, batch_size, 
                                     shuffle = True, eval_mode = False, num_workers = 32,
-                                    get_distinct_perts = False, batch_exp = False):
+                                    get_distinct_perts = False, batch_exp = False,
+                                    max_cells = None):
         print_sys("Creating dataloaders....")
         cell_graphs = []
         num_workers = min(os.cpu_count(), num_workers)
@@ -348,6 +349,9 @@ class PertData:
                         raise ValueError('Something is wrong...')
                 else:
                     data_load = self.dataset_processed[p]
+
+                if max_cells is not None and len(data_load) > max_cells:
+                    data_load = data_load[:max_cells]
 
                 if eval_mode:
                     if p != 'ctrl':

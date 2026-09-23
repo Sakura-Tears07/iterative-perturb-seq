@@ -218,10 +218,13 @@ class RandomSelectionMethod(SelectionMethod):
     def __init__(self, pool_features: Features, **config):
         super().__init__()
         self.pool_features = pool_features
+        self.random_seed = config.get('random_seed', None)
 
     def select(self, batch_size: int) -> torch.Tensor:
         device = self.pool_features.get_device()
         generator = torch.Generator(device=device)
+        if self.random_seed is not None:
+            generator.manual_seed(int(self.random_seed))
         return torch.randperm(self.pool_features.get_n_samples(),
                               device=self.pool_features.get_device(),
                               generator=generator)[:batch_size]
