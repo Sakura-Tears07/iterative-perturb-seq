@@ -52,6 +52,15 @@ def main():
                    seed=args.seed, run=args.run)
     itf.initialize_data(path=PATH, dataset_name=DATASET, batch_size=args.batch_size,
                         max_cells_per_pert=args.cells)
+    # control is a shared resource, not a selectable perturbation:
+    # remove it from the candidate pool (it stays available as ctrl_mean / ctrl graph)
+    pt = itf.dataset.pert_train
+    keep = np.array([str(x) != 'ctrl' for x in pt])
+    n_removed = int((~keep).sum())
+    itf.dataset.pert_train = pt[keep]
+    itf.dataset.n_pool = len(itf.dataset.pert_train)
+    itf.dataset.labeled_idxs = np.zeros(itf.dataset.n_pool, dtype=bool)
+
     # budget audit: cells actually available to every consumer
     pert_data = itf.dataset.pert_data
     n_pool_perts = len(itf.dataset.pert_train)
@@ -59,7 +68,8 @@ def main():
     audit = dict(arm=args.arm, run=args.run, cells_per_pert=args.cells,
                  n_train_perts=n_pool_perts, n_test_perts=itf.dataset.n_test,
                  cap_enforced_in='train/val/selection dataloaders (verified: exactly cells_per_pert)',
-                 ctrl_in_pool=bool('ctrl' in set(map(str, itf.dataset.pert_train))),
+                 ctrl_removed_from_pool=int(n_removed),
+                 ctrl_in_pool_after=bool('ctrl' in set(map(str, itf.dataset.pert_train))),
                  n_control_cells=float(n_ctrl),
                  purchased_cells_per_campaign=float((args.n_init + args.n_round * args.n_query) * args.cells),
                  control_cells_charged=float(n_ctrl))
