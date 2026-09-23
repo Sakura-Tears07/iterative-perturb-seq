@@ -328,6 +328,8 @@ class PertData:
                     raise ValueError('No use cases for this, since this is for evaluation and not using any base cell information!')
                 else:
                     data_load = self.dataset_processed[p]
+                if max_cells is not None and len(data_load) > max_cells:
+                    data_load = data_load[:max_cells]
                 if eval_mode:
                     if p != 'ctrl':
                         cell_graphs.extend([data_load[0]])

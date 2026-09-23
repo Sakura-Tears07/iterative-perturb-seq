@@ -79,7 +79,8 @@ class IterPert:
         self.net = Net(params, self.device, self.dataset.pert_data, fix_evaluation)                   # load network
 
     def initialize_active_learning_strategy(self, strategy, integrate_mode = 'mean_new',
-                                           fix_typiclust_branch = False, random_seed = None):
+                                           fix_typiclust_branch = False, random_seed = None,
+                                           use_prior_only = False):
         available = ['Random', 'BALD', 'BatchBALD', 'BAIT', 'ACS-FW', 'Core-Set', 'BADGE', 'LCMD', 'IterPert', 'TypiClust', 'KMeansSampling']
         if strategy not in available:
             raise ValueError('Strategy not in the current available set: ' + ' '.join(available))
@@ -170,7 +171,7 @@ class IterPert:
                                                                     kernel_transforms, self.device, 
                                                                     sel_with_train, 
                                                                     reduce_latent_feat_dim_via_pca = False, 
-                                                                    use_prior_only = False, 
+                                                                    use_prior_only = use_prior_only, 
                                                                     integrate_mode = integrate_mode, 
                                                                     normalize_mode = 'max', 
                                                                     prior_kernel_list = prior_kernel_list, 
