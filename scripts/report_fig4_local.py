@@ -18,6 +18,7 @@ from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
+import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -164,6 +165,27 @@ def main():
             lm = "—" if pd.isna(r.local_mean) else f"{r.local_mean:.4f} ({int(r.local_n)})"
             dv = "—" if r.dev_from_teacher is None else f"{r.dev_from_teacher:+.2f}"
             md.append(f"| {r.prior} | {r.n_labeled} | {tm} | {lm} | {dv} |")
+    # ---- AUC table (primary metric; @600 alone hides process differences) ----
+    def _auc(vals, ns):
+        x = (np.asarray(ns, float) - ns[0]) / (ns[-1] - ns[0])
+        return float(np.trapezoid(np.asarray(vals, float), x))
+    md.append("\n## 归一化梯形 AUC（主指标）\n")
+    md.append("| 方法 | 本机 AUC | 老师 AUC | 差 | 本机 n |")
+    md.append("|---|---|---|---|---|")
+    auc_rows = []
+    for name, (d, token) in METHOD_DIRS.items():
+        t = load_teacher(d)
+        l = load_local(d, token)
+        if l is None:
+            continue
+        ns = sorted(l.index)
+        la = _auc([l.loc[n, "local_mean"] for n in ns], ns)
+        ta = _auc([t.loc[n, "mean"] for n in ns], ns) if (t is not None and all(n in t.index for n in ns)) else None
+        auc_rows.append((name, la, ta, int(l["local_n"].max())))
+    for name, la, ta, ln in sorted(auc_rows, key=lambda r: -r[1]):
+        md.append(f"| {name} | {la:.4f} | " +
+                  (f"{ta:.4f} | {la-ta:+.4f} |" if ta is not None else "— | — |") +
+                  f" {ln} |")
     md.append("\n## 读法\n")
     md.append("- |dev| < 1：本机单/少 run 落在老师 10-run 分布的 1σ 内（协议忠实）。\n")
     md.append("- |dev| > 2 持续存在：需要排查协议差异（见 `notes` 中的已知差异清单）。\n")
